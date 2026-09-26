@@ -710,7 +710,7 @@ function abrirVisita(id) {
       '<div><label class="campo" for="rp-asesor">Asesor</label><select id="rp-asesor">' + opcionesAsesor(v.asesor_id, true) + '</select></div>' +
       '</div><button class="btn" id="rp-ok" style="margin-top:12px">Guardar nuevo horario</button></details>' : '') +
     (!edita ? '<div class="muted" style="font-size:13px">Es la agenda de otro asesor: podés verla pero no modificarla.</div>' : '') +
-    (edita && activa && v.wa_id ? '<label class="avisar"><input type="checkbox" id="avisar" checked> Avisarle por WhatsApp si la reprogramo o la cancelo</label>' : '') +
+    (edita && activa && v.wa_id ? '<label class="avisar"><input type="checkbox" id="avisar" checked> Avisarle por WhatsApp si la confirmo, la reprogramo o la cancelo</label>' : '') +
     '</div>' +
     '<div class="m-pie">' + (edita && activa
       ? (v.estado === 'pendiente' ? '<button class="btn" data-estado="confirmada">Confirmar</button>' : '') +
@@ -726,7 +726,7 @@ function abrirVisita(id) {
                (avisa ? 'Le vamos a avisar por WhatsApp.' : v.wa_id ? 'No se le va a avisar: acordate de escribirle.' : 'La visita no tiene WhatsApp: avisale por otro medio.') });
       if (!ok) return;
     }
-    const avisar = est === 'cancelada' && !!($('#avisar', dlg) && $('#avisar', dlg).checked);
+    const avisar = (est === 'cancelada' || est === 'confirmada') && !!($('#avisar', dlg) && $('#avisar', dlg).checked);
     await escribir('visita_marcar', { visita_id: v.id, estado: est, avisar }, 'Visita marcada como ' + ESTADOS[est][0].toLowerCase() + '.', dlg);
   }));
   const rp = $('#rp-ok', dlg);
