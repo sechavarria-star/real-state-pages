@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel Real State</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---------------------------------------------------------------------------
+   Mismo esquema que los paneles de Grun e YPF: fondo oscuro, el color de marca
+   es solo cromo (foco, tab activa, botones). --brand lo pisa la marca de cada
+   cliente (cuentas.marca.color_acento) después del login.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: #0a0a0b;
+  --surface-0: #111114;
+  --surface-1: #16161a;
+  --surface-2: #1e1e23;
+  --border: #2a2a31;
+  --text: #ffffff;
+  --text-2: #a1a1ad;
+  --text-3: #8b8b97;
+  --brand: #2f7df6;
+  --brand-texto: #0a0a0b;
+  --link: #7fb0ff;
+  --good: #3fbf6a; --good-bg: #10261a;
+  --warn: #fab219; --warn-bg: #1f1a0c; --warn-border: #5a4410;
+  --bad: #f0625a; --bad-bg: #2a1414; --bad-border: #6b2a2a;
+  --libre: rgba(255, 255, 255, 0.05);
+  --r: 12px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+h2 { font-size: 15px; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.mono { font-family: "DM Mono", ui-monospace, monospace; }
+.muted { color: var(--text-3); }
+.sec { color: var(--text-2); }
+button, select, input, textarea { font-family: inherit; font-size: 14px; color: var(--text); }
+button { cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.btn {
+  font-weight: 600; background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px 14px; min-height: 40px; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); }
+.btn.primario { background: var(--brand); border-color: var(--brand); color: var(--brand-texto); }
+.btn.primario:hover:not(:disabled) { filter: brightness(1.08); background: var(--brand); }
+.btn.peligro { color: var(--bad); border-color: var(--bad-border); }
+.btn.chico { min-height: 32px; padding: 5px 10px; font-size: 13px; }
+.chip {
+  font-size: 13px; font-weight: 600; color: var(--text-2); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 999px; padding: 7px 13px; min-height: 36px; white-space: nowrap;
+}
+.chip.on { color: var(--text); background: var(--surface-2); border-color: var(--brand); }
+.pill {
+  display: inline-block; font-size: 11.5px; font-weight: 600; color: var(--text-2);
+  background: var(--surface-2); border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+}
+.pill.bad { color: var(--bad); background: var(--bad-bg); }
+.pill.good { color: var(--good); background: var(--good-bg); }
+.pill.warn { color: var(--warn); background: var(--warn-bg); }
+.pill.info { color: var(--link); background: #111c33; }
+.aviso {
+  font-size: 13px; color: var(--warn); background: var(--warn-bg);
+  border: 1px solid var(--warn-border); border-radius: 8px; padding: 10px 12px;
+}
+.panel {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0;
+}
+.panel-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.panel-cab .muted { font-size: 12px; }
+.vacio { color: var(--text-3); font-size: 13.5px; padding: 18px 0; text-align: center; }
+input[type=password], input[type=email], input[type=text], input[type=search], input[type=date],
+input[type=time], input[type=datetime-local], select, textarea {
+  width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--bg); font-size: 15px; min-height: 42px;
+}
+textarea { min-height: 70px; resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: transparent; }
+label.campo { display: block; font-size: 12px; color: var(--text-2); margin: 0 0 6px; }
+.fila { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+/* ---------- logo / marca del cliente ---------- */
+.marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.marca .logo {
+  width: 38px; height: 38px; border-radius: 10px; flex: none; display: grid; place-items: center;
+  background: var(--brand); color: var(--brand-texto); font-weight: 700; font-size: 15px; overflow: hidden;
+}
+.marca .logo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.marca strong { display: block; font-size: 15px; font-weight: 700; line-height: 1.15; }
+.marca span { display: block; font-size: 11px; letter-spacing: .12em; color: var(--text-3); text-transform: uppercase; }
+
+/* ---------- ingreso ---------- */
+#login { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.card-login {
+  width: 100%; max-width: 380px; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 14px; padding: 30px 26px;
+}
+.card-login h1 { font-size: 19px; margin: 22px 0 6px; }
+.card-login p { color: var(--text-2); font-size: 13.5px; margin: 0 0 20px; }
+.card-login .grupo { margin-bottom: 14px; }
+.recordar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); margin: 4px 0 18px; }
+.recordar input { width: 18px; height: 18px; accent-color: var(--brand); }
+.error { color: var(--bad); font-size: 13px; min-height: 20px; margin-top: 10px; }
+
+/* ---------- estructura ---------- */
+header.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 14px 32px; border-bottom: 1px solid var(--border);
+}
+.acciones { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.quien { font-size: 12.5px; color: var(--text-2); text-align: right; line-height: 1.3; }
+nav.tabs { display: flex; gap: 2px; padding: 0 32px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+nav.tabs button {
+  background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-2);
+  font-size: 14px; font-weight: 600; padding: 13px 14px; white-space: nowrap;
+}
+nav.tabs button:hover { color: var(--text); }
+nav.tabs button.activo { color: var(--text); border-bottom-color: var(--brand); }
+nav.tabs .n { font-size: 11px; background: var(--surface-2); color: var(--text-2); border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
+main { padding: 22px 32px 40px; display: flex; flex-direction: column; gap: 16px; max-width: 1520px; margin: 0 auto; }
+.barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.barra .espacio { flex: 1; }
+
+/* ---------- resumen ---------- */
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+.kpi b { display: block; font-size: 26px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.2; }
+.kpi span { font-size: 12.5px; color: var(--text-2); }
+.dos { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.embudo { display: flex; flex-direction: column; gap: 9px; }
+.embudo .paso { display: grid; grid-template-columns: 170px 1fr 44px; align-items: center; gap: 10px; font-size: 13.5px; }
+.embudo .barra-e { height: 22px; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
+.embudo .barra-e i { display: block; height: 100%; background: var(--brand); border-radius: 6px; min-width: 2px; }
+.embudo .paso b { text-align: right; font-variant-numeric: tabular-nums; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.t th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; padding: 0 8px 8px; }
+table.t td { padding: 9px 8px; border-top: 1px solid var(--border); }
+table.t td.num, table.t th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.calor { display: grid; grid-template-columns: 34px repeat(24, 1fr); gap: 2px; font-size: 10px; color: var(--text-3); }
+.calor i { height: 16px; border-radius: 3px; background: var(--surface-2); }
+.scroll-x { overflow-x: auto; }
+.alertas { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- agenda ---------- */
+.agenda-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface-1); }
+.agenda { display: grid; grid-template-columns: 52px repeat(7, minmax(132px, 1fr)); min-width: 980px; }
+.agenda .cab { position: sticky; top: 0; z-index: 3; background: var(--surface-1); border-bottom: 1px solid var(--border);
+  padding: 9px 8px; font-size: 12.5px; font-weight: 600; color: var(--text-2); text-align: center; }
+.agenda .cab.hoy { color: var(--text); }
+.agenda .cab.hoy span { background: var(--brand); color: var(--brand-texto); border-radius: 6px; padding: 1px 6px; }
+.agenda .horas { position: relative; border-right: 1px solid var(--border); }
+.agenda .horas div { position: absolute; right: 6px; font-size: 10.5px; color: var(--text-3); transform: translateY(-50%); }
+.agenda .dia { position: relative; border-right: 1px solid var(--border); background:
+  repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--hpx) - 1px), var(--border) calc(var(--hpx) - 1px), var(--border) var(--hpx)); }
+.agenda .dia:last-child { border-right: 0; }
+.franja { position: absolute; left: 0; right: 0; background: var(--libre); }
+.bloq { position: absolute; left: 0; right: 0; z-index: 1;
+  background: repeating-linear-gradient(135deg, #2a1414 0 6px, #1a0f0f 6px 12px); opacity: .85; }
+.bloq span { position: absolute; top: 2px; left: 4px; font-size: 10.5px; color: var(--bad); }
+.vis {
+  position: absolute; z-index: 2; border-radius: 7px; padding: 3px 6px; overflow: hidden; text-align: left;
+  font-size: 11.5px; line-height: 1.25; border: 1px solid rgba(255,255,255,.12); color: #0a0a0b;
+}
+.vis b { display: block; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vis span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .85; }
+.vis.cancelada { opacity: .35; text-decoration: line-through; }
+.vis.realizada { opacity: .6; }
+.vis.ausente { opacity: .45; outline: 2px dashed var(--bad); }
+.ahora { position: absolute; left: 0; right: 0; height: 2px; background: var(--bad); z-index: 4; }
+.leyenda { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); }
+.leyenda i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.lista-vis { display: flex; flex-direction: column; }
+.lista-vis button {
+  display: grid; grid-template-columns: 118px 1fr auto; gap: 12px; align-items: center; text-align: left;
+  background: none; border: 0; border-top: 1px solid var(--border); padding: 11px 4px; font-size: 13.5px;
+}
+.lista-vis button:first-child { border-top: 0; }
+.lista-vis button:hover { background: var(--surface-2); }
+
+/* ---------- conversaciones ---------- */
+.conv { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; min-height: 60vh; }
+.conv-lista { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.conv-items { display: flex; flex-direction: column; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: 72vh; }
+.conv-items button { text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.conv-items button:hover { background: var(--surface-2); }
+.conv-items button.sel { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--brand); }
+.conv-items .l1 { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 14px; }
+.conv-items .l2 { font-size: 12.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hilo { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow: auto; padding: 4px; }
+.burbuja { max-width: 78%; padding: 7px 11px; border-radius: 12px; font-size: 13.5px; white-space: pre-wrap; word-wrap: break-word; }
+.burbuja.in { align-self: flex-start; background: var(--surface-2); }
+.burbuja.out { align-self: flex-end; background: #16305c; }
+.burbuja.err { background: var(--bad-bg); color: var(--bad); }
+.burbuja small { display: block; font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
+.dia-sep { align-self: center; font-size: 11px; color: var(--text-3); margin: 8px 0 2px; }
+.datos-contacto { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--text-2); }
+
+/* ---------- modal ---------- */
+dialog { background: var(--surface-1); color: var(--text); border: 1px solid var(--border); border-radius: 14px;
+  padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog .m-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+dialog .m-cuerpo { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--border); }
+.x { background: none; border: 0; color: var(--text-2); font-size: 22px; line-height: 1; padding: 4px 8px; min-height: 36px; }
+.dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 13.5px; }
+.dl dt { color: var(--text-3); }
+.dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tramos { display: flex; flex-direction: column; gap: 10px; }
+.tramo-dia { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: start; }
+.tramo-dia > b { font-size: 13px; padding-top: 9px; }
+.tramo-lista { display: flex; flex-direction: column; gap: 6px; }
+.tramo { display: grid; grid-template-columns: 1fr 1fr 36px; gap: 6px; }
+.tramo button { min-height: 42px; }
+#toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 50; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; font-size: 13.5px; max-width: calc(100vw - 32px); }
+#toast.bad { border-color: var(--bad-border); color: var(--bad); }
+.cargando { opacity: .55; pointer-events: none; }
+#volver { display: none; }
+
+@media (max-width: 860px) {
+  header.top { padding: 12px 16px; }
+  nav.tabs { padding: 0 8px; }
+  main { padding: 16px 16px 32px; }
+  .conv { grid-template-columns: 1fr; }
+  .conv.detalle .conv-lista { display: none; }
+  .conv:not(.detalle) .conv-det { display: none; }
+  .embudo .paso { grid-template-columns: 120px 1fr 36px; }
+  .lista-vis button { grid-template-columns: 96px 1fr; }
+  .lista-vis button > :last-child { grid-column: 2; }
+  .quien { display: none; }
+  #volver { display: inline-block; }
+}
+</style>
+</head>
+<body>
+
+<!-- ---------------- ingreso ---------------- -->
+<section id="login" hidden>
+  <form class="card-login" id="form-login" autocomplete="on">
+    <div class="marca"><div class="logo">RS</div><div><strong>Panel comercial</strong><span>Real State</span></div></div>
+    <h1>Ingresá a tu panel</h1>
+    <p>Leads, agenda de visitas y conversaciones del asistente de WhatsApp.</p>
+    <div class="grupo"><label class="campo" for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="grupo"><label class="campo" for="clave">Clave</label><input id="clave" type="password" autocomplete="current-password" required></div>
+    <label class="recordar"><input type="checkbox" id="recordar"> Recordarme en este dispositivo</label>
+    <button class="btn primario" style="width:100%" id="btn-login">Ingresar</button>
+    <div class="error" id="error-login" role="alert"></div>
+  </form>
+</section>
+
+<!-- ---------------- app ---------------- -->
+<section id="app" hidden>
+  <header class="top">
+    <div class="marca"><div class="logo" id="logo"></div><div><strong id="cuenta-nombre"></strong><span>Panel comercial</span></div></div>
+    <div class="acciones">
+      <div class="quien"><b id="usuario-nombre"></b><br><span id="usuario-rol"></span></div>
+      <select id="periodo" aria-label="Período" style="width:auto;min-height:40px">
+        <option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option>
+        <option value="90">Últimos 90 días</option><option value="0">Todo</option>
+      </select>
+      <button class="btn" id="btn-actualizar">Actualizar</button>
+      <button class="btn" id="btn-salir">Salir</button>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button data-tab="resumen" class="activo">Resumen</button>
+    <button data-tab="agenda">Agenda <span class="n" id="n-proximas"></span></button>
+    <button data-tab="conversaciones">Conversaciones <span class="n" id="n-conv"></span></button>
+  </nav>
+  <main>
+    <div id="alertas-top" class="alertas"></div>
+
+    <!-- Resumen -->
+    <section data-vista="resumen" class="alertas" style="gap:16px">
+      <div class="kpis" id="kpis"></div>
+      <div class="dos">
+        <div class="panel"><div class="panel-cab"><h2>Embudo del asistente</h2><span class="muted" id="embudo-periodo"></span></div><div class="embudo" id="embudo"></div></div>
+        <div class="panel"><div class="panel-cab"><h2>Proyectos en venta</h2><span class="muted">en el período</span></div><div class="scroll-x" id="por-proyecto"></div></div>
+      </div>
+      <div class="panel"><div class="panel-cab"><h2>Cuándo escriben</h2><span class="muted">mensajes recibidos por día y hora</span></div><div class="scroll-x"><div id="calor" style="min-width:560px"></div></div></div>
+    </section>
+
+    <!-- Agenda -->
+    <section data-vista="agenda" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="barra">
+        <button class="btn chico" id="sem-ant" aria-label="Semana anterior">◀</button>
+        <button class="btn chico" id="sem-hoy">Hoy</button>
+        <button class="btn chico" id="sem-sig" aria-label="Semana siguiente">▶</button>
+        <b id="sem-titulo" style="margin-left:6px"></b>
+        <span class="espacio"></span>
+        <select id="filtro-asesor" aria-label="Asesor" style="width:auto;min-width:190px"></select>
+        <button class="btn" id="btn-bloqueos">Bloqueos</button>
+        <button class="btn" id="btn-horarios">Horarios</button>
+        <button class="btn primario" id="btn-nueva">+ Nueva visita</button>
+      </div>
+      <div class="leyenda" id="leyenda"></div>
+      <div class="agenda-wrap"><div class="agenda" id="agenda"></div></div>
+      <div class="panel"><div class="panel-cab"><h2>Visitas de la semana</h2><span class="muted" id="lista-vis-n"></span></div><div class="lista-vis" id="lista-vis"></div></div>
+    </section>
+
+    <!-- Conversaciones -->
+    <section data-vista="conversaciones" hidden>
+      <div class="conv" id="conv">
+        <div class="conv-lista">
+          <input type="search" id="buscar" placeholder="Buscar por nombre, número o proyecto">
+          <div class="conv-items" id="conv-items"></div>
+        </div>
+        <div class="conv-det panel" id="conv-det"><div class="vacio">Elegí una conversación.</div></div>
+      </div>
+    </section>
+  </main>
+</section>
+
+<!-- ---------------- modales ---------------- -->
+<dialog id="dlg-visita"></dialog>
+<dialog id="dlg-nueva"></dialog>
+<dialog id="dlg-bloqueos"></dialog>
+<dialog id="dlg-horarios"></dialog>
+<div id="toast" hidden role="status"></div>
+
+<script>
+'use strict';
+// API: Edge Function realstate-panel. Todo lo que devuelve viene de la base y se
+// escapa con esc() antes de ir al HTML (los mensajes los escribe cualquiera por WhatsApp).
+const API = 'https://ofhiogczijhzkuqdjwvz.supabase.co/functions/v1/realstate-panel';
+const LS = 'realstate_panel_token';
+const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DIAS_LARGO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const ESTADOS = { pendiente: ['Pendiente', 'warn'], confirmada: ['Confirmada', 'info'], realizada: ['Realizada', 'good'], ausente: ['Ausente', 'bad'], cancelada: ['Cancelada', ''] };
+const COLORES = ['#7fb0ff', '#f2b56b', '#8fd6a8', '#e39ad8', '#f08a80', '#b6a4f5', '#6fd3d8', '#d9d27a'];
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = (n, d = 0) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: d });
+const plata = (n, m) => (m || 'USD') + ' ' + num(n);
+
+let token = null;
+let D = null;            // datos generales (contexto + resumen + conversaciones)
+let AG = null;           // agenda de la semana visible
+let semana = null;       // lunes de la semana visible (Date a medianoche en la zona)
+let convSel = null;
+
+// ---------------- red ----------------
+async function api(accion, extra = {}) {
+  const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ accion, token, ...extra }) });
+  let j = {};
+  try { j = await r.json(); } catch { /* respuesta vacía */ }
+  if (r.status === 401 && accion !== 'login') { salir(j.error || 'Sesión vencida.'); throw new Error('401'); }
+  if (!r.ok) throw new Error(j.error || 'Error ' + r.status);
+  return j;
+}
+function toast(t, mal) {
+  const el = $('#toast'); el.textContent = t; el.className = mal ? 'bad' : ''; el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), mal ? 6000 : 3000);
+}
+const guardarToken = (t, recordar) => { try { (recordar ? localStorage : sessionStorage).setItem(LS, t); } catch { /* sin storage */ } };
+const leerToken = () => { try { return sessionStorage.getItem(LS) || localStorage.getItem(LS); } catch { return null; } };
+const borrarToken = () => { try { sessionStorage.removeItem(LS); localStorage.removeItem(LS); } catch { /* nada */ } };
+
+// ---------------- fechas en la zona de la cuenta ----------------
+const zona = () => (D && D.cuenta && D.cuenta.agenda && D.cuenta.agenda.zona) || 'America/Argentina/Buenos_Aires';
+function partes(fecha) {
+  const p = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: zona(), year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' })
+    .formatToParts(new Date(fecha)).forEach((x) => (p[x.type] = x.value));
+  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, min: +p.minute, dow: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday) };
+}
+// 'YYYY-MM-DD' + 'HH:MM' en la zona de la cuenta → Date (UTC)
+function enZona(fecha, hora) {
+  const [y, m, d] = fecha.split('-').map(Number), [h, mi] = hora.split(':').map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  const p = partes(guess);
+  const off = Date.UTC(p.y, p.m - 1, p.d, p.h, p.min) - guess;
+  return new Date(guess - off);
+}
+const pad = (n) => String(n).padStart(2, '0');
+const isoDia = (p) => p.y + '-' + pad(p.m) + '-' + pad(p.d);
+const hhmm = (f) => { const p = partes(f); return pad(p.h) + ':' + pad(p.min); };
+const fechaCorta = (f) => { const p = partes(f); return DIAS[p.dow] + ' ' + pad(p.d) + '/' + pad(p.m); };
+const fechaHora = (f) => f ? fechaCorta(f) + ' ' + hhmm(f) : '—';
+function lunesDe(f) {
+  const p = partes(f);
+  const lunes = new Date(Date.UTC(p.y, p.m - 1, p.d) - ((p.dow + 6) % 7) * 86400000);
+  return enZona(lunes.toISOString().slice(0, 10), '00:00');
+}
+const sumarDias = (f, n) => { const p = partes(+f + n * 86400000 + 12 * 3600000); return enZona(isoDia(p), '00:00'); };
+
+// ---------------- ingreso ----------------
+$('#form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('#btn-login'); btn.disabled = true; $('#error-login').textContent = '';
+  try {
+    const r = await api('login', { email: $('#email').value.trim(), clave: $('#clave').value });
+    token = r.token; guardarToken(token, $('#recordar').checked); $('#clave').value = '';
+    await iniciar();
+  } catch (err) {
+    $('#error-login').textContent = err.message;
+  } finally { btn.disabled = false; }
+});
+function salir(msj) {
+  token = null; D = null; borrarToken();
+  $('#app').hidden = true; $('#login').hidden = false;
+  if (msj) $('#error-login').textContent = msj;
+}
+$('#btn-salir').addEventListener('click', () => salir());
+
+// ---------------- carga ----------------
+async function cargar() {
+  document.body.classList.add('cargando');
+  try {
+    D = await api('datos', { dias: Number($('#periodo').value) });
+    aplicarMarca();
+    pintarResumen();
+    pintarConversaciones();
+    await cargarAgenda();
+  } finally { document.body.classList.remove('cargando'); }
+}
+async function iniciar() {
+  $('#login').hidden = true; $('#app').hidden = false;
+  await cargar();
+  if (!semana) semana = lunesDe(Date.now());
+  armarFiltroAsesor();
+  await cargarAgenda();
+}
+$('#btn-actualizar').addEventListener('click', () => cargar().catch((e) => toast(e.message, true)));
+$('#periodo').addEventListener('change', () => cargar().catch((e) => toast(e.message, true)));
+
+function aplicarMarca() {
+  const c = D.cuenta || {}, m = c.marca || {};
+  $('#cuenta-nombre').textContent = c.nombre || '';
+  document.title = 'Panel · ' + (c.nombre || 'Real State');
+  const color = m.color_acento || m.color || '#2f7df6';
+  document.documentElement.style.setProperty('--brand', color);
+  // texto sobre el color de marca: negro o blanco según la luminancia
+  const rgb = color.replace('#', '').match(/../g).map((h) => parseInt(h, 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  document.documentElement.style.setProperty('--brand-texto', lum > 0.35 ? '#0a0a0b' : '#ffffff');
+  $('#logo').innerHTML = m.logo_url ? '<img alt="" src="' + esc(m.logo_url) + '">' : esc((c.nombre || '?').slice(0, 2).toUpperCase());
+  $('#usuario-nombre').textContent = D.usuario.nombre;
+  $('#usuario-rol').textContent = D.usuario.rol === 'admin' ? 'Administrador' : 'Asesor';
+  const top = (D.alertas || []).filter((a) => a.donde === 'resumen' || a.donde === 'agenda');
+  $('#alertas-top').innerHTML = top.map((a) => '<div class="aviso">' + esc(a.texto) + '</div>').join('');
+}
+
+// ---------------- tabs ----------------
+$$('nav.tabs button').forEach((b) => b.addEventListener('click', () => {
+  $$('nav.tabs button').forEach((x) => x.classList.toggle('activo', x === b));
+  $$('[data-vista]').forEach((v) => (v.hidden = v.dataset.vista !== b.dataset.tab));
+}));
+
+// ---------------- resumen ----------------
+function pintarResumen() {
+  const k = D.kpis || {};
+  const t = [
+    [k.conversaciones, 'Conversaciones'], [k.simulaciones, 'Simulaciones de cuotas'], [k.oportunidades, 'Oportunidades'],
+    [k.visitas_agendadas, 'Visitas agendadas'], [k.visitas_proximas, 'Visitas próximas'], [k.visitas_realizadas, 'Visitas realizadas'],
+  ];
+  $('#kpis').innerHTML = t.map(([n, l]) => '<div class="kpi"><b>' + num(n) + '</b><span>' + l + '</span></div>').join('');
+  $('#n-proximas').textContent = k.visitas_proximas || '';
+  const e = D.embudo || [], max = Math.max(1, ...e.map((x) => x.n));
+  $('#embudo-periodo').textContent = $('#periodo').selectedOptions[0].textContent.toLowerCase();
+  $('#embudo').innerHTML = e.map((x) => '<div class="paso"><span>' + esc(x.label) + '</span><div class="barra-e"><i style="width:' + (x.n / max * 100) + '%"></i></div><b>' + num(x.n) + '</b></div>').join('');
+  const pp = D.por_proyecto || [];
+  $('#por-proyecto').innerHTML = pp.length ? '<table class="t"><thead><tr><th>Proyecto</th><th class="num">Simul.</th><th class="num">Oport.</th><th class="num">Visitas</th><th class="num">Unid. disp.</th></tr></thead><tbody>' +
+    pp.map((p) => '<tr><td>' + esc(p.nombre) + '</td><td class="num">' + num(p.simulaciones) + '</td><td class="num">' + num(p.oportunidades) + '</td><td class="num">' + num(p.visitas) + '</td><td class="num">' + num(p.disponibles) + '</td></tr>').join('') +
+    '</tbody></table>' : '<div class="vacio">No hay proyectos en venta.</div>';
+  const ph = D.por_hora || [], mh = Math.max(1, ...ph.map((x) => x.n));
+  const m = {}; ph.forEach((x) => (m[x.dia + '|' + x.hora] = x.n));
+  let h = '<span></span>' + Array.from({ length: 24 }, (_, i) => '<span style="text-align:center">' + (i % 3 ? '' : i) + '</span>').join('');
+  ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].forEach((d, di) => {
+    h += '<span>' + d + '</span>';
+    for (let i = 0; i < 24; i++) {
+      const n = m[di + '|' + i] || 0;
+      h += '<i title="' + d + ' ' + i + 'h: ' + n + '" style="' + (n ? 'background:var(--brand);opacity:' + (0.2 + 0.8 * n / mh).toFixed(2) : '') + '"></i>';
+    }
+  });
+  $('#calor').className = 'calor'; $('#calor').innerHTML = h;
+}
+
+// ---------------- agenda ----------------
+const asesores = () => (D.asesores || []).filter((a) => a.activo);
+const colorAsesor = (id) => COLORES[Math.max(0, asesores().findIndex((a) => a.id === id)) % COLORES.length];
+const nombreAsesor = (id) => ((D.asesores || []).find((a) => a.id === id) || {}).nombre || '—';
+const puedeEditar = (asesorId) => D.usuario.rol === 'admin' || D.usuario.asesor_id === asesorId;
+
+function armarFiltroAsesor() {
+  const sel = $('#filtro-asesor');
+  const previo = sel.value;
+  sel.innerHTML = '<option value="">Todos los asesores</option>' + asesores().map((a) => '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>').join('');
+  sel.value = previo || (D.usuario.rol === 'asesor' ? D.usuario.asesor_id : '');
+}
+$('#filtro-asesor').addEventListener('change', pintarAgenda);
+$('#sem-ant').addEventListener('click', () => { semana = sumarDias(semana, -7); cargarAgenda().catch((e) => toast(e.message, true)); });
+$('#sem-sig').addEventListener('click', () => { semana = sumarDias(semana, 7); cargarAgenda().catch((e) => toast(e.message, true)); });
+$('#sem-hoy').addEventListener('click', () => { semana = lunesDe(Date.now()); cargarAgenda().catch((e) => toast(e.message, true)); });
+
+async function cargarAgenda() {
+  if (!semana || !D) return;
+  AG = await api('agenda', { desde: semana.toISOString(), hasta: sumarDias(semana, 7).toISOString() });
+  pintarAgenda();
+}
+
+function pintarAgenda() {
+  if (!AG) return;
+  const filtro = $('#filtro-asesor').value;
+  const ids = filtro ? [filtro] : asesores().map((a) => a.id);
+  const horarios = (D.horarios || []).filter((h) => ids.includes(h.asesor_id));
+  // rango horario visible: el de los horarios cargados, con margen; si no hay, 9 a 19
+  const minH = horarios.length ? Math.max(0, Math.min(...horarios.map((h) => +h.desde.slice(0, 2))) - 1) : 9;
+  const maxH = horarios.length ? Math.min(24, Math.max(...horarios.map((h) => Math.ceil(+h.hasta.slice(0, 2) + +h.hasta.slice(3) / 60))) + 1) : 19;
+  const HPX = 52, alto = (maxH - minH) * HPX;
+  const y = (f) => { const p = partes(f); return (p.h + p.min / 60 - minH) * HPX; };
+  const hoy = isoDia(partes(Date.now()));
+  const dias = Array.from({ length: 7 }, (_, i) => sumarDias(semana, i));
+  const p0 = partes(dias[0]), p6 = partes(dias[6]);
+  $('#sem-titulo').textContent = pad(p0.d) + '/' + pad(p0.m) + ' – ' + pad(p6.d) + '/' + pad(p6.m);
+
+  const vis = (AG.visitas || []).filter((v) => ids.includes(v.asesor_id));
+  let h = '<div class="cab"></div>' + dias.map((d) => { const p = partes(d); return '<div class="cab' + (isoDia(p) === hoy ? ' hoy' : '') + '"><span>' + DIAS[p.dow] + ' ' + pad(p.d) + '/' + pad(p.m) + '</span></div>'; }).join('');
+  h += '<div class="horas" style="height:' + alto + 'px">' + Array.from({ length: maxH - minH }, (_, i) => i ? '<div style="top:' + i * HPX + 'px">' + pad(minH + i) + ':00</div>' : '').join('') + '</div>';
+  dias.forEach((d) => {
+    const p = partes(d), dia = isoDia(p);
+    let c = '<div class="dia" style="height:' + alto + 'px;--hpx:' + HPX + 'px" data-dia="' + dia + '">';
+    // franjas de disponibilidad (solo con un asesor filtrado, o la unión de todos)
+    horarios.filter((hh) => hh.dia_semana === p.dow).forEach((hh) => {
+      const a = enZona(dia, hh.desde), b = enZona(dia, hh.hasta);
+      c += '<div class="franja" style="top:' + y(a) + 'px;height:' + (y(b) - y(a)) + 'px"></div>';
+    });
+    (AG.bloqueos || []).filter((b) => !b.asesor_id || ids.includes(b.asesor_id)).forEach((b) => {
+      const ini = Math.max(+new Date(b.desde), +enZona(dia, pad(minH) + ':00')), fin = Math.min(+new Date(b.hasta), +enZona(dia, pad(Math.min(maxH, 23)) + ':59'));
+      if (fin <= ini) return;
+      c += '<div class="bloq" title="' + esc(b.motivo || 'Bloqueo') + ' · ' + esc(b.asesor_id ? nombreAsesor(b.asesor_id) : 'Toda la cuenta') + '" style="top:' + y(ini) + 'px;height:' + (y(fin) - y(ini)) + 'px"><span>' + esc(b.motivo || 'Bloqueado') + '</span></div>';
+    });
+    // visitas del día; si se superponen (distintos asesores) se reparten a lo ancho
+    const delDia = vis.filter((v) => isoDia(partes(v.inicio)) === dia);
+    const cols = [];
+    delDia.forEach((v) => {
+      let k = cols.findIndex((fin) => fin <= +new Date(v.inicio));
+      if (k < 0) { k = cols.length; cols.push(0); }
+      cols[k] = +new Date(v.fin); v._col = k;
+    });
+    const n = Math.max(1, cols.length);
+    delDia.forEach((v) => {
+      const top = y(v.inicio), alto2 = Math.max(22, y(v.fin) - top - 2);
+      c += '<button class="vis ' + esc(v.estado) + '" data-visita="' + esc(v.id) + '" style="top:' + top + 'px;height:' + alto2 + 'px;left:calc(' + (v._col * 100 / n) + '% + 2px);width:calc(' + (100 / n) + '% - 4px);background:' + colorAsesor(v.asesor_id) + '">' +
+        '<b>' + hhmm(v.inicio) + ' ' + esc(v.nombre || 'Sin nombre') + '</b><span>' + esc(v.proyecto || '') + '</span></button>';
+    });
+    if (dia === hoy) { const t = y(Date.now()); if (t > 0 && t < alto) c += '<div class="ahora" style="top:' + t + 'px"></div>'; }
+    $('#agenda').style.setProperty('--hpx', HPX + 'px');
+    h += c + '</div>';
+  });
+  $('#agenda').innerHTML = h;
+  $$('#agenda [data-visita]').forEach((b) => b.addEventListener('click', () => abrirVisita(b.dataset.visita)));
+
+  $('#leyenda').innerHTML = (filtro ? asesores().filter((a) => a.id === filtro) : asesores())
+    .map((a) => '<span><i style="background:' + colorAsesor(a.id) + '"></i>' + esc(a.nombre) + '</span>').join('') +
+    '<span><i style="background:var(--libre);border:1px solid var(--border)"></i>Horario de atención</span>' +
+    '<span><i style="background:repeating-linear-gradient(135deg,#2a1414 0 3px,#1a0f0f 3px 6px)"></i>Bloqueado</span>';
+
+  const act = vis.filter((v) => v.estado !== 'cancelada');
+  $('#lista-vis-n').textContent = act.length + (act.length === 1 ? ' visita' : ' visitas');
+  $('#lista-vis').innerHTML = vis.length ? vis.map((v) =>
+    '<button data-visita="' + esc(v.id) + '"><span class="mono">' + fechaHora(v.inicio) + '</span><span><b>' + esc(v.nombre || 'Sin nombre') + '</b> · ' + esc(v.proyecto || 'Sin proyecto') +
+    '<br><span class="muted">' + esc(nombreAsesor(v.asesor_id)) + (v.origen === 'panel' ? ' · cargada en el panel' : '') + '</span></span>' +
+    '<span class="pill ' + (ESTADOS[v.estado] || ['', ''])[1] + '">' + (ESTADOS[v.estado] || [v.estado])[0] + '</span></button>').join('')
+    : '<div class="vacio">No hay visitas esta semana.</div>';
+  $$('#lista-vis [data-visita]').forEach((b) => b.addEventListener('click', () => abrirVisita(b.dataset.visita)));
+}
+
+// ---------------- modal: visita ----------------
+function cerrarCon(dlg) { dlg.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', () => dlg.close())); }
+function opcionesAsesor(sel, soloEditables) {
+  return asesores().filter((a) => !soloEditables || puedeEditar(a.id))
+    .map((a) => '<option value="' + esc(a.id) + '"' + (a.id === sel ? ' selected' : '') + '>' + esc(a.nombre) + '</option>').join('');
+}
+function abrirVisita(id) {
+  const v = (AG.visitas || []).find((x) => x.id === id);
+  if (!v) return;
+  const dlg = $('#dlg-visita'), edita = puedeEditar(v.asesor_id), activa = ['pendiente', 'confirmada'].includes(v.estado);
+  const sim = v.simulacion;
+  const p = partes(v.inicio);
+  dlg.innerHTML =
+    '<div class="m-cab"><h2>' + esc(v.nombre || 'Visita') + ' <span class="pill ' + (ESTADOS[v.estado] || ['', ''])[1] + '">' + (ESTADOS[v.estado] || [v.estado])[0] + '</span></h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo"><dl class="dl">' +
+    '<dt>Cuándo</dt><dd>' + DIAS_LARGO[p.dow] + ' ' + pad(p.d) + '/' + pad(p.m) + ' · ' + hhmm(v.inicio) + '–' + hhmm(v.fin) + '</dd>' +
+    '<dt>Asesor</dt><dd>' + esc(nombreAsesor(v.asesor_id)) + '</dd>' +
+    '<dt>Proyecto</dt><dd>' + esc(v.proyecto || '—') + '</dd>' +
+    '<dt>Lugar</dt><dd>' + esc(v.lugar || '—') + '</dd>' +
+    '<dt>WhatsApp</dt><dd>' + (v.wa_id ? '<a href="https://wa.me/' + esc(v.wa_id) + '" target="_blank" rel="noopener">+' + esc(v.wa_id) + '</a>' : '—') + '</dd>' +
+    (sim ? '<dt>Simuló</dt><dd>' + esc(sim.unidad_id) + ' · ' + plata(sim.precio, sim.moneda) + ' · ' + num(sim.anticipo_pct) + ' % + ' + num(sim.cuotas) + ' cuotas de ' + plata(sim.cuota, sim.moneda) + '</dd>' : '') +
+    (v.oportunidad ? '<dt>Oportunidad</dt><dd>' + esc(v.oportunidad) + (v.prioridad ? ' · prioridad ' + esc(v.prioridad) : '') + '</dd>' : '') +
+    '<dt>Origen</dt><dd>' + (v.origen === 'panel' ? 'Cargada en el panel' : 'Agendada por el asistente') + '</dd>' +
+    (v.notas ? '<dt>Notas</dt><dd>' + esc(v.notas) + '</dd>' : '') +
+    '</dl>' +
+    (edita && activa ? '<details><summary style="cursor:pointer;font-weight:600">Reprogramar</summary><div class="fila" style="margin-top:12px">' +
+      '<div><label class="campo" for="rp-fecha">Fecha</label><input type="date" id="rp-fecha" value="' + isoDia(p) + '"></div>' +
+      '<div><label class="campo" for="rp-hora">Hora</label><input type="time" id="rp-hora" step="900" value="' + hhmm(v.inicio) + '"></div>' +
+      '<div><label class="campo" for="rp-asesor">Asesor</label><select id="rp-asesor">' + opcionesAsesor(v.asesor_id, true) + '</select></div>' +
+      '</div><button class="btn" id="rp-ok" style="margin-top:12px">Guardar nuevo horario</button></details>' : '') +
+    (!edita ? '<div class="muted" style="font-size:13px">Es la agenda de otro asesor: podés verla pero no modificarla.</div>' : '') +
+    '</div>' +
+    '<div class="m-pie">' + (edita && activa
+      ? (v.estado === 'pendiente' ? '<button class="btn" data-estado="confirmada">Confirmar</button>' : '') +
+        '<button class="btn" data-estado="realizada">Realizada</button><button class="btn" data-estado="ausente">No vino</button><button class="btn peligro" data-estado="cancelada">Cancelar visita</button>'
+      : '<button class="btn" data-cerrar>Cerrar</button>') + '</div>';
+  cerrarCon(dlg);
+  dlg.querySelectorAll('[data-estado]').forEach((b) => b.addEventListener('click', async () => {
+    const est = b.dataset.estado;
+    if (est === 'cancelada' && !confirm('¿Cancelar la visita? El turno queda libre. Recordá avisarle al interesado.')) return;
+    await escribir('visita_marcar', { visita_id: v.id, estado: est }, 'Visita marcada como ' + ESTADOS[est][0].toLowerCase() + '.', dlg);
+  }));
+  const rp = $('#rp-ok', dlg);
+  if (rp) rp.addEventListener('click', async () => {
+    const f = $('#rp-fecha', dlg).value, t = $('#rp-hora', dlg).value;
+    if (!f || !t) return toast('Elegí fecha y hora.', true);
+    await escribir('visita_reprogramar', { visita_id: v.id, inicio: enZona(f, t).toISOString(), asesor_id: $('#rp-asesor', dlg).value },
+      'Visita reprogramada. Avisale al interesado el nuevo horario.', dlg);
+  });
+  dlg.showModal();
+}
+
+async function escribir(accion, datos, ok, dlg) {
+  document.body.classList.add('cargando');
+  try {
+    await api(accion, { datos });
+    if (dlg) dlg.close();
+    toast(ok);
+    await cargar();
+  } catch (e) {
+    if (e.message !== '401') toast(e.message, true);
+  } finally { document.body.classList.remove('cargando'); }
+}
+
+// ---------------- modal: nueva visita ----------------
+$('#btn-nueva').addEventListener('click', () => {
+  const dlg = $('#dlg-nueva');
+  const editables = asesores().filter((a) => puedeEditar(a.id));
+  if (!editables.length) return toast('No tenés asesores a cargo.', true);
+  const man = partes(+Date.now() + 86400000);
+  dlg.innerHTML = '<form method="dialog" id="f-nueva"><div class="m-cab"><h2>Nueva visita</h2><button type="button" class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo">' +
+    '<div class="fila"><div><label class="campo" for="nv-asesor">Asesor</label><select id="nv-asesor" required>' + opcionesAsesor($('#filtro-asesor').value || D.usuario.asesor_id, true) + '</select></div>' +
+    '<div><label class="campo" for="nv-proy">Proyecto</label><select id="nv-proy"><option value="">—</option>' +
+    (D.proyectos || []).filter((p) => p.en_venta).map((p) => '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>').join('') + '</select></div></div>' +
+    '<div class="fila"><div><label class="campo" for="nv-fecha">Fecha</label><input type="date" id="nv-fecha" required value="' + isoDia(man) + '"></div>' +
+    '<div><label class="campo" for="nv-hora">Hora</label><input type="time" id="nv-hora" step="900" required value="11:00"></div></div>' +
+    '<div class="fila"><div><label class="campo" for="nv-nombre">Nombre del interesado</label><input type="text" id="nv-nombre" required maxlength="80"></div>' +
+    '<div><label class="campo" for="nv-wa">WhatsApp (opcional)</label><input type="text" id="nv-wa" inputmode="tel" placeholder="54 9 11 …" maxlength="25"></div></div>' +
+    '<div><label class="campo" for="nv-notas">Notas</label><textarea id="nv-notas" maxlength="500"></textarea></div>' +
+    '<div class="muted" style="font-size:12.5px">Duración: ' + num((D.cuenta.agenda || {}).duracion_min || 45) + ' min. No se puede superponer con otra visita del mismo asesor ni con un bloqueo.</div>' +
+    '</div><div class="m-pie"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario">Agendar</button></div></form>';
+  cerrarCon(dlg);
+  $('#f-nueva', dlg).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await escribir('visita_crear', {
+      asesor_id: $('#nv-asesor', dlg).value, proyecto_id: $('#nv-proy', dlg).value || null,
+      inicio: enZona($('#nv-fecha', dlg).value, $('#nv-hora', dlg).value).toISOString(),
+      nombre: $('#nv-nombre', dlg).value.trim(), wa_id: $('#nv-wa', dlg).value.trim(), notas: $('#nv-notas', dlg).value.trim(),
+    }, 'Visita agendada.', dlg);
+  });
+  dlg.showModal();
+});
+
+// ---------------- modal: bloqueos ----------------
+$('#btn-bloqueos').addEventListener('click', () => {
+  const dlg = $('#dlg-bloqueos');
+  const esAdmin = D.usuario.rol === 'admin';
+  const bl = (AG.bloqueos || []).filter((b) => +new Date(b.hasta) > Date.now());
+  const hoy = isoDia(partes(Date.now()));
+  dlg.innerHTML = '<div class="m-cab"><h2>Bloqueos de agenda</h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo"><div class="muted" style="font-size:13px">En un bloqueo el asistente no ofrece turnos. Sirve para vacaciones, feriados o reuniones.</div>' +
+    (bl.length ? '<table class="t"><tbody>' + bl.map((b) =>
+      '<tr><td>' + fechaHora(b.desde) + ' → ' + fechaHora(b.hasta) + '<br><span class="muted">' + esc(b.asesor_id ? nombreAsesor(b.asesor_id) : 'Toda la cuenta') + (b.motivo ? ' · ' + esc(b.motivo) : '') + '</span></td>' +
+      '<td class="num">' + ((b.asesor_id ? puedeEditar(b.asesor_id) : esAdmin) ? '<button class="btn chico peligro" data-borrar="' + esc(b.id) + '">Quitar</button>' : '') + '</td></tr>').join('') + '</tbody></table>'
+      : '<div class="vacio">No hay bloqueos vigentes.</div>') +
+    '<h3 style="font-size:14px">Nuevo bloqueo</h3>' +
+    '<div class="fila"><div><label class="campo" for="bl-asesor">Para</label><select id="bl-asesor">' + (esAdmin ? '<option value="">Toda la cuenta</option>' : '') + opcionesAsesor(D.usuario.asesor_id, true) + '</select></div>' +
+    '<div><label class="campo" for="bl-motivo">Motivo</label><input type="text" id="bl-motivo" maxlength="80" placeholder="Vacaciones, feriado…"></div></div>' +
+    '<div class="fila"><div><label class="campo" for="bl-d1">Desde</label><input type="date" id="bl-d1" value="' + hoy + '"></div><div><label class="campo" for="bl-h1">Hora</label><input type="time" id="bl-h1" value="00:00"></div></div>' +
+    '<div class="fila"><div><label class="campo" for="bl-d2">Hasta</label><input type="date" id="bl-d2" value="' + hoy + '"></div><div><label class="campo" for="bl-h2">Hora</label><input type="time" id="bl-h2" value="23:59"></div></div>' +
+    '</div><div class="m-pie"><button class="btn" data-cerrar>Cerrar</button><button class="btn primario" id="bl-ok">Agregar bloqueo</button></div>';
+  cerrarCon(dlg);
+  dlg.querySelectorAll('[data-borrar]').forEach((b) => b.addEventListener('click', () => escribir('bloqueo_borrar', { id: Number(b.dataset.borrar) }, 'Bloqueo quitado.', dlg)));
+  $('#bl-ok', dlg).addEventListener('click', () => {
+    const desde = enZona($('#bl-d1', dlg).value, $('#bl-h1', dlg).value), hasta = enZona($('#bl-d2', dlg).value, $('#bl-h2', dlg).value);
+    if (!(hasta > desde)) return toast('El fin tiene que ser posterior al inicio.', true);
+    escribir('bloqueo_crear', { asesor_id: $('#bl-asesor', dlg).value || null, desde: desde.toISOString(), hasta: hasta.toISOString(), motivo: $('#bl-motivo', dlg).value.trim() }, 'Bloqueo agregado.', dlg);
+  });
+  dlg.showModal();
+});
+
+// ---------------- modal: horarios semanales ----------------
+$('#btn-horarios').addEventListener('click', () => {
+  const dlg = $('#dlg-horarios');
+  const editables = asesores().filter((a) => puedeEditar(a.id));
+  if (!editables.length) return toast('No tenés asesores a cargo.', true);
+  let asesor = editables.some((a) => a.id === $('#filtro-asesor').value) ? $('#filtro-asesor').value : editables[0].id;
+  const pintar = () => {
+    const hs = (D.horarios || []).filter((h) => h.asesor_id === asesor);
+    const orden = [1, 2, 3, 4, 5, 6, 0];
+    dlg.innerHTML = '<div class="m-cab"><h2>Horarios de atención</h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+      '<div class="m-cuerpo"><div><label class="campo" for="hs-asesor">Asesor</label><select id="hs-asesor">' + opcionesAsesor(asesor, true) + '</select></div>' +
+      '<div class="muted" style="font-size:13px">El asistente ofrece turnos de ' + num((D.cuenta.agenda || {}).duracion_min || 45) + ' min dentro de estos horarios. Un día puede tener varios tramos.</div>' +
+      '<div class="tramos">' + orden.map((d) => '<div class="tramo-dia"><b>' + DIAS[d] + '</b><div class="tramo-lista" data-dia="' + d + '">' +
+        hs.filter((h) => h.dia_semana === d).map((h) => filaTramo(h.desde, h.hasta)).join('') +
+        '<button class="btn chico" data-agregar style="align-self:flex-start">+ tramo</button></div></div>').join('') + '</div></div>' +
+      '<div class="m-pie"><button class="btn" data-cerrar>Cancelar</button><button class="btn primario" id="hs-ok">Guardar horarios</button></div>';
+    cerrarCon(dlg);
+    $('#hs-asesor', dlg).addEventListener('change', (e) => { asesor = e.target.value; pintar(); });
+    dlg.querySelectorAll('[data-agregar]').forEach((b) => b.addEventListener('click', () => { b.insertAdjacentHTML('beforebegin', filaTramo('10:00', '18:00')); enganchar(); }));
+    enganchar();
+    $('#hs-ok', dlg).addEventListener('click', () => {
+      const tramos = [];
+      let mal = false;
+      dlg.querySelectorAll('.tramo-lista').forEach((l) => l.querySelectorAll('.tramo').forEach((t) => {
+        const [a, b] = t.querySelectorAll('input');
+        if (!a.value || !b.value || b.value <= a.value) mal = true;
+        tramos.push({ dia_semana: Number(l.dataset.dia), desde: a.value, hasta: b.value });
+      }));
+      if (mal) return toast('Revisá los tramos: la hora de fin tiene que ser posterior a la de inicio.', true);
+      escribir('horarios_guardar', { asesor_id: asesor, tramos }, 'Horarios guardados. El asistente ya ofrece los nuevos turnos.', dlg);
+    });
+  };
+  const filaTramo = (a, b) => '<div class="tramo"><input type="time" step="900" value="' + esc(a) + '" aria-label="Desde"><input type="time" step="900" value="' + esc(b) + '" aria-label="Hasta"><button class="btn chico peligro" data-quitar aria-label="Quitar tramo">×</button></div>';
+  const enganchar = () => dlg.querySelectorAll('[data-quitar]').forEach((b) => (b.onclick = () => b.closest('.tramo').remove()));
+  pintar();
+  dlg.showModal();
+});
+
+// ---------------- conversaciones ----------------
+const ETAPAS = { inicio: 'Inicio', consulta: 'Consulta', catalogo: 'Vio proyectos', detalle: 'Vio un proyecto', simulando: 'Simulando', simulado: 'Simuló', derivado: 'Pidió visita / asesor', visita_agendada: 'Visita agendada', handoff: 'Con asesor', cerrado: 'Cerrado' };
+function pintarConversaciones() {
+  const cs = D.conversaciones || [];
+  $('#n-conv').textContent = cs.length || '';
+  const q = $('#buscar').value.trim().toLowerCase();
+  const f = cs.filter((c) => !q || [c.nombre, c.wa_id, c.proyecto, c.asesor].join(' ').toLowerCase().includes(q));
+  $('#conv-items').innerHTML = f.length ? f.map((c) =>
+    '<button data-wa="' + esc(c.wa_id) + '" class="' + (c.wa_id === convSel ? 'sel' : '') + '"><span class="l1"><span>' + esc(c.nombre || '+' + c.wa_id) + '</span>' +
+    '<span class="muted" style="font-weight:400;font-size:12px">' + (c.ultimo_ts ? fechaHora(c.ultimo_ts) : '') + '</span></span>' +
+    '<span class="l2">' + (c.modo === 'humano' ? '<span class="pill warn">Con asesor</span> ' : '') + esc(ETAPAS[c.etapa] || c.etapa || '') + (c.proyecto ? ' · ' + esc(c.proyecto) : '') + '</span>' +
+    '<span class="l2">' + esc(c.ultimo_mensaje || '') + '</span></button>').join('')
+    : '<div class="vacio">Sin conversaciones.</div>';
+  $$('#conv-items [data-wa]').forEach((b) => b.addEventListener('click', () => abrirConversacion(b.dataset.wa)));
+  if (convSel) pintarCabeceraConv();
+}
+$('#buscar').addEventListener('input', pintarConversaciones);
+
+async function abrirConversacion(wa) {
+  convSel = wa;
+  $$('#conv-items [data-wa]').forEach((b) => b.classList.toggle('sel', b.dataset.wa === wa));
+  $('#conv').classList.add('detalle');
+  $('#conv-det').innerHTML = '<div class="vacio">Cargando…</div>';
+  try {
+    const h = await api('hilo', { wa_id: wa });
+    pintarCabeceraConv(h);
+  } catch (e) { if (e.message !== '401') $('#conv-det').innerHTML = '<div class="vacio">' + esc(e.message) + '</div>'; }
+}
+function pintarCabeceraConv(h) {
+  if (h) pintarCabeceraConv.h = h; else h = pintarCabeceraConv.h;
+  const c = (D.conversaciones || []).find((x) => x.wa_id === convSel);
+  if (!c || !h) return;
+  let dia = '', msgs = '';
+  (h.mensajes || []).forEach((m) => {
+    const d = isoDia(partes(m.ts));
+    if (d !== dia) { dia = d; msgs += '<div class="dia-sep">' + fechaCorta(m.ts) + '</div>'; }
+    msgs += '<div class="burbuja ' + (m.dir === 'in' ? 'in' : 'out') + (m.tipo === 'error_envio' ? ' err' : '') + '">' + esc(m.texto || '[' + m.tipo + ']') +
+      '<small>' + hhmm(m.ts) + (m.dir === 'out' ? ' · ' + esc(m.autor) : '') + (m.tipo === 'error_envio' ? ' · no se envió' : '') + '</small></div>';
+  });
+  const sims = (h.simulaciones || []).slice(0, 3).map((s) => '<li>' + fechaCorta(s.ts) + ' · ' + esc(s.proyecto || '') + ' ' + esc(s.unidad_id || '') + ': ' + plata(s.precio, s.moneda) + ', ' + num(s.anticipo_pct) + ' % + ' + num(s.cuotas) + ' × ' + plata(s.cuota, s.moneda) + '</li>').join('');
+  const vis = (h.visitas || []).map((v) => '<li>' + fechaHora(v.inicio) + ' · ' + esc(v.asesor) + ' · ' + (ESTADOS[v.estado] || [v.estado])[0] + '</li>').join('');
+  $('#conv-det').innerHTML =
+    '<div class="panel-cab"><div><button class="btn chico" id="volver" style="margin-right:8px">←</button><h2 style="display:inline">' + esc(c.nombre || '+' + c.wa_id) + '</h2></div>' +
+    '<div class="acciones"><a class="btn chico" href="https://wa.me/' + esc(c.wa_id) + '" target="_blank" rel="noopener">Escribir por WhatsApp</a>' +
+    (c.modo === 'humano' ? '<button class="btn chico" id="modo" data-modo="bot">Devolver al asistente</button>' : '<button class="btn chico" id="modo" data-modo="humano">Tomar conversación</button>') + '</div></div>' +
+    '<div class="datos-contacto"><span>+' + esc(c.wa_id) + '</span><span>' + esc(ETAPAS[c.etapa] || c.etapa || '') + '</span>' +
+    (c.modo === 'humano' ? '<span class="pill warn">El asistente está en pausa</span>' : '<span class="pill good">Atiende el asistente</span>') +
+    (c.asesor ? '<span>Asesor: ' + esc(c.asesor) + '</span>' : '') + (c.oportunidad ? '<span>Oportunidad: ' + esc(c.oportunidad) + '</span>' : '') +
+    (c.proxima_visita ? '<span>Próxima visita: ' + fechaHora(c.proxima_visita) + '</span>' : '') + '</div>' +
+    (sims || vis ? '<div class="dos" style="gap:12px">' + (sims ? '<div><h3 style="font-size:13px">Simulaciones</h3><ul class="sec" style="margin:6px 0 0;padding-left:18px;font-size:13px">' + sims + '</ul></div>' : '') +
+      (vis ? '<div><h3 style="font-size:13px">Visitas</h3><ul class="sec" style="margin:6px 0 0;padding-left:18px;font-size:13px">' + vis + '</ul></div>' : '') + '</div>' : '') +
+    '<div class="hilo" id="hilo">' + (msgs || '<div class="vacio">Sin mensajes.</div>') + '</div>';
+  const hilo = $('#hilo'); hilo.scrollTop = hilo.scrollHeight;
+  $('#volver').addEventListener('click', () => $('#conv').classList.remove('detalle'));
+  $('#modo').addEventListener('click', async (e) => {
+    const modo = e.target.dataset.modo;
+    await escribir('sesion_modo', { wa_id: c.wa_id, modo }, modo === 'humano' ? 'Tomaste la conversación: el asistente no va a responder.' : 'El asistente vuelve a responder.');
+    abrirConversacion(c.wa_id);
+  });
+}
+
+// ---------------- arranque ----------------
+(async () => {
+  token = leerToken();
+  if (!token) { $('#login').hidden = false; return; }
+  try { await iniciar(); } catch (e) { if (e.message !== '401') { salir(e.message); } }
+})();
+</script>
+</body>
+</html>
