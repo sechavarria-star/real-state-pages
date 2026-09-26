@@ -236,6 +236,12 @@ dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-
 .cargando { opacity: .55; pointer-events: none; }
 #volver { display: none; }
 .n:empty { display: none; }
+.composer { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.composer .fila-c { display: flex; gap: 8px; align-items: flex-end; }
+.composer textarea { min-height: 46px; max-height: 160px; }
+.composer .hint { font-size: 12px; color: var(--text-3); }
+.avisar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+.avisar input { width: 18px; height: 18px; accent-color: var(--brand); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chips .chip .n { font-size: 11px; color: var(--text-3); margin-left: 4px; }
 table.t tr.click { cursor: pointer; }
@@ -685,6 +691,7 @@ function abrirVisita(id) {
       '<div><label class="campo" for="rp-asesor">Asesor</label><select id="rp-asesor">' + opcionesAsesor(v.asesor_id, true) + '</select></div>' +
       '</div><button class="btn" id="rp-ok" style="margin-top:12px">Guardar nuevo horario</button></details>' : '') +
     (!edita ? '<div class="muted" style="font-size:13px">Es la agenda de otro asesor: podés verla pero no modificarla.</div>' : '') +
+    (edita && activa && v.wa_id ? '<label class="avisar"><input type="checkbox" id="avisar" checked> Avisarle por WhatsApp si la reprogramo o la cancelo</label>' : '') +
     '</div>' +
     '<div class="m-pie">' + (edita && activa
       ? (v.estado === 'pendiente' ? '<button class="btn" data-estado="confirmada">Confirmar</button>' : '') +
@@ -693,15 +700,17 @@ function abrirVisita(id) {
   cerrarCon(dlg);
   dlg.querySelectorAll('[data-estado]').forEach((b) => b.addEventListener('click', async () => {
     const est = b.dataset.estado;
-    if (est === 'cancelada' && !confirm('¿Cancelar la visita? El turno queda libre. Recordá avisarle al interesado.')) return;
-    await escribir('visita_marcar', { visita_id: v.id, estado: est }, 'Visita marcada como ' + ESTADOS[est][0].toLowerCase() + '.', dlg);
+    if (est === 'cancelada' && !confirm('¿Cancelar la visita? El turno queda libre.' + ($('#avisar', dlg) && $('#avisar', dlg).checked ? ' Le vamos a avisar por WhatsApp.' : ' Recordá avisarle al interesado.'))) return;
+    const avisar = est === 'cancelada' && !!($('#avisar', dlg) && $('#avisar', dlg).checked);
+    await escribir('visita_marcar', { visita_id: v.id, estado: est, avisar }, 'Visita marcada como ' + ESTADOS[est][0].toLowerCase() + '.', dlg);
   }));
   const rp = $('#rp-ok', dlg);
   if (rp) rp.addEventListener('click', async () => {
     const f = $('#rp-fecha', dlg).value, t = $('#rp-hora', dlg).value;
     if (!f || !t) return toast('Elegí fecha y hora.', true);
-    await escribir('visita_reprogramar', { visita_id: v.id, inicio: enZona(f, t).toISOString(), asesor_id: $('#rp-asesor', dlg).value },
-      'Visita reprogramada. Avisale al interesado el nuevo horario.', dlg);
+    const avisar = !!($('#avisar', dlg) && $('#avisar', dlg).checked);
+    await escribir('visita_reprogramar', { visita_id: v.id, inicio: enZona(f, t).toISOString(), asesor_id: $('#rp-asesor', dlg).value, avisar },
+      avisar ? 'Visita reprogramada.' : 'Visita reprogramada. Avisale al interesado el nuevo horario.', dlg);
   });
   dlg.showModal();
 }
@@ -709,9 +718,11 @@ function abrirVisita(id) {
 async function escribir(accion, datos, ok, dlg) {
   document.body.classList.add('cargando');
   try {
-    await api(accion, { datos });
+    const res = await api(accion, { datos });
     if (dlg) dlg.close();
-    toast(ok);
+    const av = res && res.aviso;
+    if (av) toast(ok + (av.enviado ? ' Le avisamos por WhatsApp' + (av.via === 'plantilla' ? ' (con plantilla).' : '.') : ' No se pudo avisar por WhatsApp: ' + av.error), !av.enviado);
+    else toast(ok);
     await cargar();
     const t = tabActiva();
     if (t === 'pipeline') await cargarPipeline();
@@ -847,6 +858,8 @@ async function abrirConversacion(wa) {
   } catch (e) { if (e.message !== '401') $('#conv-det').innerHTML = '<div class="vacio">' + esc(e.message) + '</div>'; }
 }
 function pintarCabeceraConv(h) {
+  // Sin datos nuevos y con el cursor en el cuadro de respuesta: no se redibuja (se perdería el foco).
+  if (!h && document.activeElement && document.activeElement.id === 'msg') return;
   if (h) pintarCabeceraConv.h = h; else h = pintarCabeceraConv.h;
   const c = (D.conversaciones || []).find((x) => x.wa_id === convSel);
   if (!c || !h) return;
@@ -869,8 +882,9 @@ function pintarCabeceraConv(h) {
     (c.proxima_visita ? '<span>Próxima visita: ' + fechaHora(c.proxima_visita) + '</span>' : '') + '</div>' +
     (sims || vis ? '<div class="dos" style="gap:12px">' + (sims ? '<div><h3 style="font-size:13px">Simulaciones</h3><ul class="sec" style="margin:6px 0 0;padding-left:18px;font-size:13px">' + sims + '</ul></div>' : '') +
       (vis ? '<div><h3 style="font-size:13px">Visitas</h3><ul class="sec" style="margin:6px 0 0;padding-left:18px;font-size:13px">' + vis + '</ul></div>' : '') + '</div>' : '') +
-    '<div class="hilo" id="hilo">' + (msgs || '<div class="vacio">Sin mensajes.</div>') + '</div>';
+    '<div class="hilo" id="hilo">' + (msgs || '<div class="vacio">Sin mensajes.</div>') + '</div>' + composer(c, h);
   const hilo = $('#hilo'); hilo.scrollTop = hilo.scrollHeight;
+  engancharComposer(c);
   $('#volver').addEventListener('click', () => $('#conv').classList.remove('detalle'));
   $('#modo').addEventListener('click', async (e) => {
     const modo = e.target.dataset.modo;
@@ -1144,6 +1158,63 @@ function abrirClave(obligatorio) {
   dlg.showModal();
 }
 $('#btn-clave').addEventListener('click', () => abrirClave(false));
+
+// ---------------- responder por WhatsApp ----------------
+const VENTANA_MS = (23 * 60 + 50) * 60000;   // Meta: 24 h desde el último mensaje del interesado (con margen)
+let borrador = {};
+function composer(c, h) {
+  const ult = h.ultimo_in ? +new Date(h.ultimo_in) : 0, resta = ult + VENTANA_MS - Date.now();
+  if (resta > 0) {
+    const hs = Math.floor(resta / 3600000), min = Math.floor(resta % 3600000 / 60000);
+    return '<div class="composer"><div class="fila-c"><textarea id="msg" maxlength="4000" placeholder="Escribí tu respuesta… (Ctrl+Enter para enviar)">' + esc(borrador[c.wa_id] || '') + '</textarea>' +
+      '<button class="btn primario" id="btn-enviar">Enviar</button></div>' +
+      '<div class="hint">Ventana de WhatsApp abierta: quedan ' + (hs ? hs + ' h ' : '') + min + ' min para escribir libre. ' +
+      (h.modo === 'humano' ? 'El asistente está en pausa en esta conversación.' : 'Al enviar, el asistente queda en pausa en esta conversación.') + '</div></div>';
+  }
+  return '<div class="composer"><div class="aviso">Pasaron más de 24 h desde el último mensaje de ' + esc(c.nombre || 'esta persona') +
+    ': WhatsApp solo permite retomar con una plantilla aprobada. Cuando responda, se abre de nuevo la ventana para escribir libre.</div>' +
+    '<div class="fila-c"><button class="btn primario" id="btn-retomar">Retomar contacto</button><span class="hint">Le llega: “Hola ' + esc((c.nombre || '').split(' ')[0] || '…') + ', te escribe ' + esc(D.usuario.nombre) + ' de ' + esc(D.cuenta.nombre) +
+    ' por tu consulta sobre ' + esc(c.proyecto || 'nuestros proyectos') + '. ¿Seguimos por acá?…”</span></div></div>';
+}
+function engancharComposer(c) {
+  const ta = $('#msg'), be = $('#btn-enviar'), br = $('#btn-retomar');
+  if (ta) {
+    ta.addEventListener('input', () => (borrador[c.wa_id] = ta.value));
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); be.click(); } });
+  }
+  if (be) be.addEventListener('click', async () => {
+    const texto = ta.value.trim();
+    if (!texto) return;
+    be.disabled = true;
+    try {
+      await api('enviar', { wa_id: c.wa_id, texto });
+      borrador[c.wa_id] = '';
+      toast('Mensaje enviado.');
+      await refrescarConversacion(true);
+    } catch (e) { if (e.message !== '401') toast(e.message, true); be.disabled = false; }
+  });
+  if (br) br.addEventListener('click', async () => {
+    if (!confirm('¿Enviar la plantilla para retomar el contacto? El asistente queda en pausa en esta conversación.')) return;
+    br.disabled = true;
+    try {
+      await api('retomar', { wa_id: c.wa_id });
+      toast('Plantilla enviada. Cuando responda, vas a poder escribirle libre.');
+      await refrescarConversacion(true);
+    } catch (e) { if (e.message !== '401') toast(e.message, true); br.disabled = false; }
+  });
+}
+// Refresca la conversación abierta (y la lista) cada 15 s mientras esté a la vista.
+async function refrescarConversacion(forzar) {
+  if (!convSel || !D) return;
+  if (!forzar && (document.hidden || tabActiva() !== 'conversaciones' || (document.activeElement && document.activeElement.id === 'msg' && $('#msg').value))) return;
+  try {
+    const [d, h] = await Promise.all([api('datos', { dias: Number($('#periodo').value) }), api('hilo', { wa_id: convSel })]);
+    D = d;
+    pintarConversaciones();
+    pintarCabeceraConv(h);
+  } catch (e) { /* se reintenta en el próximo ciclo */ }
+}
+setInterval(() => refrescarConversacion(false), 15000);
 
 // ---------------- arranque ----------------
 (async () => {

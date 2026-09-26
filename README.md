@@ -68,5 +68,10 @@ supabase functions deploy realstate-panel --project-ref ofhiogczijhzkuqdjwvz --n
 - Repo público: nada de datos ni secretos acá.
 - Todo lo que viene de la base pasa por `esc()` antes de ir al HTML.
 - Antes de publicar: extraer el `<script>` y `node --check`.
-- Si el panel reprograma o cancela una visita, **no se avisa al lead automáticamente**
-  (fase 3: requiere plantilla aprobada fuera de las 24 h).
+- **WhatsApp desde el panel (fase 3):** el asesor responde en Conversaciones y, al reprogramar
+  o cancelar una visita, puede avisarle al interesado. El envío lo hace el workflow de n8n
+  `Real State | Envíos del Panel` (webhook `realstate-panel-envio` con Header Auth =
+  secret `REALSTATE_N8N_ENVIO_SECRET`); la función nunca ve el token de Meta. Dentro de las
+  24 h del último mensaje del interesado va texto libre; fuera, plantilla aprobada
+  (`../real-state/meta/plantillas.json`, se crean con `scripts/crear_plantillas.py`).
+  Cuando escribe una persona, el asistente queda en pausa en esa conversación.
