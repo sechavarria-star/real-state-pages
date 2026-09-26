@@ -1163,13 +1163,16 @@ $('#btn-clave').addEventListener('click', () => abrirClave(false));
 const VENTANA_MS = (23 * 60 + 50) * 60000;   // Meta: 24 h desde el último mensaje del interesado (con margen)
 let borrador = {};
 function composer(c, h) {
+  // Con el asistente atendiendo no se ofrece escribir: primero hay que tomar la conversación.
+  if ((h.modo || c.modo) !== 'humano') {
+    return '<div class="composer"><div class="hint">Atiende el asistente. Para escribirle vos, tocá <b>Tomar conversación</b>: el asistente se pausa y se habilita el cuadro para responder.</div></div>';
+  }
   const ult = h.ultimo_in ? +new Date(h.ultimo_in) : 0, resta = ult + VENTANA_MS - Date.now();
   if (resta > 0) {
     const hs = Math.floor(resta / 3600000), min = Math.floor(resta % 3600000 / 60000);
     return '<div class="composer"><div class="fila-c"><textarea id="msg" maxlength="4000" placeholder="Escribí tu respuesta… (Ctrl+Enter para enviar)">' + esc(borrador[c.wa_id] || '') + '</textarea>' +
       '<button class="btn primario" id="btn-enviar">Enviar</button></div>' +
-      '<div class="hint">Ventana de WhatsApp abierta: quedan ' + (hs ? hs + ' h ' : '') + min + ' min para escribir libre. ' +
-      (h.modo === 'humano' ? 'El asistente está en pausa en esta conversación.' : 'Al enviar, el asistente queda en pausa en esta conversación.') + '</div></div>';
+      '<div class="hint">Ventana de WhatsApp abierta: quedan ' + (hs ? hs + ' h ' : '') + min + ' min para escribir libre. El asistente está en pausa en esta conversación.</div></div>';
   }
   return '<div class="composer"><div class="aviso">Pasaron más de 24 h desde el último mensaje de ' + esc(c.nombre || 'esta persona') +
     ': WhatsApp solo permite retomar con una plantilla aprobada. Cuando responda, se abre de nuevo la ventana para escribir libre.</div>' +
