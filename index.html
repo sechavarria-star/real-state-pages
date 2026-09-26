@@ -240,6 +240,8 @@ dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-
 .composer .fila-c { display: flex; gap: 8px; align-items: flex-end; }
 .composer textarea { min-height: 46px; max-height: 160px; }
 .composer .hint { font-size: 12px; color: var(--text-3); }
+#dlg-confirmar .m-cuerpo p { margin: 0; color: var(--text-2); font-size: 14px; }
+#dlg-confirmar .m-cuerpo .cita { font-size: 13px; color: var(--text-2); background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; white-space: pre-wrap; }
 .avisar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
 .avisar input { width: 18px; height: 18px; accent-color: var(--brand); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -400,6 +402,7 @@ table.t td .sub { display: block; font-size: 12px; color: var(--text-3); }
 <dialog id="dlg-asesor"></dialog>
 <dialog id="dlg-usuario"></dialog>
 <dialog id="dlg-clave"></dialog>
+<dialog id="dlg-confirmar" style="width:min(440px, calc(100vw - 32px))"></dialog>
 <div id="toast" hidden role="status"></div>
 
 <script>
@@ -660,6 +663,22 @@ function pintarAgenda() {
   $$('#lista-vis [data-visita]').forEach((b) => b.addEventListener('click', () => abrirVisita(b.dataset.visita)));
 }
 
+// ---------------- confirmación (reemplaza el confirm() del navegador) ----------------
+// confirmar({ titulo, texto, cita?, ok?, peligro? }) → Promise<boolean>
+function confirmar(o) {
+  const dlg = $('#dlg-confirmar');
+  dlg.innerHTML = '<div class="m-cab"><h2>' + esc(o.titulo) + '</h2></div>' +
+    '<div class="m-cuerpo"><p>' + esc(o.texto) + '</p>' + (o.cita ? '<div class="cita">' + esc(o.cita) + '</div>' : '') + '</div>' +
+    '<div class="m-pie"><button class="btn" data-r="0">Volver</button><button class="btn ' + (o.peligro ? 'peligro' : 'primario') + '" data-r="1">' + esc(o.ok || 'Confirmar') + '</button></div>';
+  return new Promise((res) => {
+    const fin = (v) => { dlg.close(); res(v); };
+    dlg.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => fin(b.dataset.r === '1')));
+    dlg.oncancel = (e) => { e.preventDefault(); fin(false); };
+    dlg.showModal();
+    dlg.querySelector('[data-r="1"]').focus();
+  });
+}
+
 // ---------------- modal: visita ----------------
 function cerrarCon(dlg) { dlg.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', () => dlg.close())); }
 function opcionesAsesor(sel, soloEditables) {
@@ -700,7 +719,13 @@ function abrirVisita(id) {
   cerrarCon(dlg);
   dlg.querySelectorAll('[data-estado]').forEach((b) => b.addEventListener('click', async () => {
     const est = b.dataset.estado;
-    if (est === 'cancelada' && !confirm('¿Cancelar la visita? El turno queda libre.' + ($('#avisar', dlg) && $('#avisar', dlg).checked ? ' Le vamos a avisar por WhatsApp.' : ' Recordá avisarle al interesado.'))) return;
+    if (est === 'cancelada') {
+      const avisa = !!($('#avisar', dlg) && $('#avisar', dlg).checked);
+      const ok = await confirmar({ titulo: 'Cancelar la visita', peligro: true, ok: 'Sí, cancelar',
+        texto: (v.nombre || 'La visita') + ' · ' + fechaHora(v.inicio) + '. El turno queda libre para otra persona. ' +
+               (avisa ? 'Le vamos a avisar por WhatsApp.' : v.wa_id ? 'No se le va a avisar: acordate de escribirle.' : 'La visita no tiene WhatsApp: avisale por otro medio.') });
+      if (!ok) return;
+    }
     const avisar = est === 'cancelada' && !!($('#avisar', dlg) && $('#avisar', dlg).checked);
     await escribir('visita_marcar', { visita_id: v.id, estado: est, avisar }, 'Visita marcada como ' + ESTADOS[est][0].toLowerCase() + '.', dlg);
   }));
@@ -984,8 +1009,13 @@ async function abrirOpp(id) {
     if (un) datos.unidad_id = un;
     if (nota) datos.nota = nota;
     if (Object.keys(datos).length === 1) return dlg.close();
-    if (est === 'perdida' && o.unidad_id && !confirm('La unidad ' + o.unidad_id + ' vuelve a quedar disponible. ¿Seguimos?')) return;
-    escribir('oportunidad_actualizar', datos, 'Oportunidad actualizada.', dlg);
+    const seguir = () => escribir('oportunidad_actualizar', datos, 'Oportunidad actualizada.', dlg);
+    if (est === 'perdida' && o.unidad_id) {
+      confirmar({ titulo: 'Marcar como perdida', peligro: true, ok: 'Sí, marcar perdida',
+        texto: 'La unidad ' + o.unidad_id + ' vuelve a quedar disponible y el asistente la puede ofrecer de nuevo.' }).then((ok) => { if (ok) seguir(); });
+      return;
+    }
+    seguir();
   });
   dlg.showModal();
 }
@@ -1197,7 +1227,11 @@ function engancharComposer(c) {
     } catch (e) { if (e.message !== '401') toast(e.message, true); be.disabled = false; }
   });
   if (br) br.addEventListener('click', async () => {
-    if (!confirm('¿Enviar la plantilla para retomar el contacto? El asistente queda en pausa en esta conversación.')) return;
+    const ok = await confirmar({ titulo: 'Retomar contacto', ok: 'Enviar',
+      texto: 'Se envía esta plantilla aprobada por WhatsApp. El asistente queda en pausa en esta conversación.',
+      cita: 'Hola ' + ((c.nombre || '').split(' ')[0] || '…') + ', te escribe ' + D.usuario.nombre + ' de ' + D.cuenta.nombre +
+            ' por tu consulta sobre ' + (c.proyecto || 'nuestros proyectos') + '. ¿Seguimos por acá? Respondé este mensaje y te ayudo con lo que necesites.' });
+    if (!ok) return;
     br.disabled = true;
     try {
       await api('retomar', { wa_id: c.wa_id });
