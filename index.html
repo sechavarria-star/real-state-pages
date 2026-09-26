@@ -235,6 +235,20 @@ dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-
 #toast.bad { border-color: var(--bad-border); color: var(--bad); }
 .cargando { opacity: .55; pointer-events: none; }
 #volver { display: none; }
+.n:empty { display: none; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips .chip .n { font-size: 11px; color: var(--text-3); margin-left: 4px; }
+table.t tr.click { cursor: pointer; }
+table.t tr.click:hover td { background: var(--surface-2); }
+table.t td .sub { display: block; font-size: 12px; color: var(--text-3); }
+.tabla-wrap { overflow-x: auto; }
+.notas { white-space: pre-wrap; font-size: 13px; color: var(--text-2); background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; max-height: 160px; overflow: auto; }
+.resumen-tip { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.resumen-tip .kpi b { font-size: 18px; }
+.barra-stock { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); margin-top: 8px; }
+.barra-stock i { display: block; height: 100%; }
+.clave-gen { display: flex; gap: 8px; }
+.clave-gen input { font-family: "DM Mono", ui-monospace, monospace; }
 
 @media (max-width: 860px) {
   header.top { padding: 12px 16px; }
@@ -278,13 +292,17 @@ dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-
         <option value="90">Últimos 90 días</option><option value="0">Todo</option>
       </select>
       <button class="btn" id="btn-actualizar">Actualizar</button>
+      <button class="btn" id="btn-clave">Mi clave</button>
       <button class="btn" id="btn-salir">Salir</button>
     </div>
   </header>
   <nav class="tabs" role="tablist">
     <button data-tab="resumen" class="activo">Resumen</button>
     <button data-tab="agenda">Agenda <span class="n" id="n-proximas"></span></button>
+    <button data-tab="pipeline">Pipeline <span class="n" id="n-pipe"></span></button>
     <button data-tab="conversaciones">Conversaciones <span class="n" id="n-conv"></span></button>
+    <button data-tab="stock">Stock</button>
+    <button data-tab="equipo" id="tab-equipo">Equipo</button>
   </nav>
   <main>
     <div id="alertas-top" class="alertas"></div>
@@ -317,6 +335,42 @@ dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-
       <div class="panel"><div class="panel-cab"><h2>Visitas de la semana</h2><span class="muted" id="lista-vis-n"></span></div><div class="lista-vis" id="lista-vis"></div></div>
     </section>
 
+    <!-- Pipeline -->
+    <section data-vista="pipeline" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="barra">
+        <div class="chips" id="pipe-estados"></div>
+        <span class="espacio"></span>
+        <select id="pipe-asesor" aria-label="Asesor" style="width:auto;min-width:170px"></select>
+        <select id="pipe-proyecto" aria-label="Proyecto" style="width:auto;min-width:170px"></select>
+        <input type="search" id="pipe-buscar" placeholder="Buscar" style="width:190px">
+      </div>
+      <div class="panel" style="padding:8px 12px"><div class="tabla-wrap" id="pipe-tabla"></div></div>
+    </section>
+
+    <!-- Stock -->
+    <section data-vista="stock" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="barra"><div class="chips" id="stock-proyectos"></div></div>
+      <div class="resumen-tip" id="stock-resumen"></div>
+      <div class="barra">
+        <div class="chips" id="stock-estados"></div>
+        <span class="espacio"></span>
+        <select id="stock-tip" aria-label="Tipología" style="width:auto;min-width:170px"></select>
+      </div>
+      <div class="panel" style="padding:8px 12px"><div class="tabla-wrap" id="stock-tabla"></div></div>
+    </section>
+
+    <!-- Equipo -->
+    <section data-vista="equipo" hidden style="display:flex;flex-direction:column;gap:16px">
+      <div class="panel">
+        <div class="panel-cab"><h2>Asesores</h2><button class="btn primario chico" id="btn-asesor-nuevo">+ Nuevo asesor</button></div>
+        <div class="tabla-wrap" id="eq-asesores"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-cab"><h2>Usuarios del panel</h2><button class="btn primario chico" id="btn-usuario-nuevo">+ Nuevo usuario</button></div>
+        <div class="tabla-wrap" id="eq-usuarios"></div>
+      </div>
+    </section>
+
     <!-- Conversaciones -->
     <section data-vista="conversaciones" hidden>
       <div class="conv" id="conv">
@@ -335,6 +389,11 @@ dialog .m-pie { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-
 <dialog id="dlg-nueva"></dialog>
 <dialog id="dlg-bloqueos"></dialog>
 <dialog id="dlg-horarios"></dialog>
+<dialog id="dlg-opp"></dialog>
+<dialog id="dlg-unidad"></dialog>
+<dialog id="dlg-asesor"></dialog>
+<dialog id="dlg-usuario"></dialog>
+<dialog id="dlg-clave"></dialog>
 <div id="toast" hidden role="status"></div>
 
 <script>
@@ -441,6 +500,8 @@ async function iniciar() {
   if (!semana) semana = lunesDe(Date.now());
   armarFiltroAsesor();
   await cargarAgenda();
+  $('#tab-equipo').hidden = D.usuario.rol !== 'admin';
+  if (D.usuario.debe_cambiar_clave) abrirClave(true);
 }
 $('#btn-actualizar').addEventListener('click', () => cargar().catch((e) => toast(e.message, true)));
 $('#periodo').addEventListener('change', () => cargar().catch((e) => toast(e.message, true)));
@@ -466,7 +527,13 @@ function aplicarMarca() {
 $$('nav.tabs button').forEach((b) => b.addEventListener('click', () => {
   $$('nav.tabs button').forEach((x) => x.classList.toggle('activo', x === b));
   $$('[data-vista]').forEach((v) => (v.hidden = v.dataset.vista !== b.dataset.tab));
+  const t = b.dataset.tab;
+  const err = (e) => { if (e.message !== '401') toast(e.message, true); };
+  if (t === 'pipeline') cargarPipeline().catch(err);
+  if (t === 'stock') cargarStock().catch(err);
+  if (t === 'equipo') cargarEquipo().catch(err);
 }));
+const tabActiva = () => ($('nav.tabs button.activo') || {}).dataset?.tab;
 
 // ---------------- resumen ----------------
 function pintarResumen() {
@@ -646,6 +713,10 @@ async function escribir(accion, datos, ok, dlg) {
     if (dlg) dlg.close();
     toast(ok);
     await cargar();
+    const t = tabActiva();
+    if (t === 'pipeline') await cargarPipeline();
+    if (t === 'stock') await cargarStock();
+    if (t === 'equipo') await cargarEquipo();
   } catch (e) {
     if (e.message !== '401') toast(e.message, true);
   } finally { document.body.classList.remove('cargando'); }
@@ -807,6 +878,272 @@ function pintarCabeceraConv(h) {
     abrirConversacion(c.wa_id);
   });
 }
+
+// ---------------- pipeline ----------------
+const EST_OPP = {
+  nueva: ['Nueva', 'info'], link_enviado: ['En contacto', 'info'], link_abierto: ['En contacto', 'info'],
+  visita_agendada: ['Visita agendada', 'warn'], visita_realizada: ['Visitó', 'warn'], reservada: ['Reservó', 'good'],
+  ganada: ['Ganada', 'good'], perdida: ['Perdida', 'bad'],
+};
+const GRUPOS = [['abiertas', 'Abiertas'], ['visita_agendada', 'Visita agendada'], ['visita_realizada', 'Visitó'], ['reservada', 'Reservó'], ['ganada', 'Ganadas'], ['perdida', 'Perdidas'], ['todas', 'Todas']];
+let PIPE = [], pipeGrupo = 'abiertas';
+const puedeOpp = (o) => D.usuario.rol === 'admin' || !o.asesor_id || o.asesor_id === D.usuario.asesor_id;
+
+async function cargarPipeline() {
+  PIPE = (await api('pipeline')).oportunidades || [];
+  const sa = $('#pipe-asesor'), sp = $('#pipe-proyecto'), va = sa.value, vp = sp.value;
+  sa.innerHTML = '<option value="">Todos los asesores</option><option value="-">Sin asignar</option>' + asesores().map((a) => '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>').join('');
+  sp.innerHTML = '<option value="">Todos los proyectos</option>' + (D.proyectos || []).filter((p) => p.en_venta).map((p) => '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>').join('');
+  sa.value = va || (D.usuario.rol === 'asesor' && !pintarPipeline.ya ? D.usuario.asesor_id : ''); sp.value = vp;
+  pintarPipeline.ya = true;
+  pintarPipeline();
+}
+function enGrupo(o, g) {
+  if (g === 'todas') return true;
+  if (g === 'abiertas') return !['ganada', 'perdida'].includes(o.estado);
+  return o.estado === g;
+}
+function pintarPipeline() {
+  const a = $('#pipe-asesor').value, p = $('#pipe-proyecto').value, q = $('#pipe-buscar').value.trim().toLowerCase();
+  const base = PIPE.filter((o) => (!a || (a === '-' ? !o.asesor_id : o.asesor_id === a)) && (!p || o.proyecto_id === p) &&
+    (!q || [o.nombre, o.wa_id, o.proyecto, o.unidad_id, nombreAsesor(o.asesor_id)].join(' ').toLowerCase().includes(q)));
+  $('#n-pipe').textContent = PIPE.filter((o) => enGrupo(o, 'abiertas')).length || '';
+  $('#pipe-estados').innerHTML = GRUPOS.map(([k, l]) => '<button class="chip' + (k === pipeGrupo ? ' on' : '') + '" data-g="' + k + '">' + l + '<span class="n">' + base.filter((o) => enGrupo(o, k)).length + '</span></button>').join('');
+  $$('#pipe-estados [data-g]').forEach((b) => b.addEventListener('click', () => { pipeGrupo = b.dataset.g; pintarPipeline(); }));
+  const f = base.filter((o) => enGrupo(o, pipeGrupo));
+  $('#pipe-tabla').innerHTML = f.length ? '<table class="t"><thead><tr><th>Interesado</th><th>Proyecto</th><th>Asesor</th><th>Estado</th><th class="num">Monto</th><th>Próx. visita</th><th>Actualizada</th></tr></thead><tbody>' +
+    f.map((o) => '<tr class="click" data-opp="' + esc(o.id) + '"><td>' + esc(o.nombre || '+' + o.wa_id) + '<span class="sub">+' + esc(o.wa_id) + (o.modo === 'humano' ? ' · con asesor' : '') + '</span></td>' +
+      '<td>' + esc(o.proyecto || '—') + (o.unidad_id ? '<span class="sub">' + esc(o.unidad_id) + '</span>' : '') + '</td>' +
+      '<td>' + (o.asesor_id ? esc(nombreAsesor(o.asesor_id)) : '<span class="muted">Sin asignar</span>') + '</td>' +
+      '<td><span class="pill ' + (EST_OPP[o.estado] || ['', ''])[1] + '">' + (EST_OPP[o.estado] || [o.estado])[0] + '</span>' + (o.prioridad ? '<span class="sub">prioridad ' + esc(o.prioridad) + '</span>' : '') + '</td>' +
+      '<td class="num">' + (o.monto ? plata(o.monto, o.moneda) : '—') + '</td>' +
+      '<td>' + (o.proxima_visita ? fechaHora(o.proxima_visita) : '—') + '</td><td class="muted">' + fechaHora(o.actualizada) + '</td></tr>').join('') + '</tbody></table>'
+    : '<div class="vacio">No hay oportunidades con ese filtro.</div>';
+  $$('#pipe-tabla [data-opp]').forEach((tr) => tr.addEventListener('click', () => abrirOpp(tr.dataset.opp)));
+}
+['#pipe-asesor', '#pipe-proyecto'].forEach((s) => $(s).addEventListener('change', pintarPipeline));
+$('#pipe-buscar').addEventListener('input', pintarPipeline);
+
+async function abrirOpp(id) {
+  const o = PIPE.find((x) => x.id === id);
+  if (!o) return;
+  const dlg = $('#dlg-opp'), edita = puedeOpp(o);
+  let libres = [];
+  if (edita && o.proyecto_id) {
+    try {
+      const st = await api('stock', { proyecto_id: o.proyecto_id });
+      libres = (st.unidades || []).filter((u) => u.estado === 'disponible' || u.oportunidad_id === o.id);
+    } catch (e) { /* sin stock: el selector queda vacío */ }
+  }
+  const sim = o.simulacion;
+  dlg.innerHTML = '<div class="m-cab"><h2>' + esc(o.nombre || '+' + o.wa_id) + ' <span class="pill ' + (EST_OPP[o.estado] || ['', ''])[1] + '">' + (EST_OPP[o.estado] || [o.estado])[0] + '</span></h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo"><dl class="dl">' +
+    '<dt>WhatsApp</dt><dd><a href="https://wa.me/' + esc(o.wa_id) + '" target="_blank" rel="noopener">+' + esc(o.wa_id) + '</a> · <a href="#" id="ver-conv">ver conversación</a></dd>' +
+    '<dt>Proyecto</dt><dd>' + esc(o.proyecto || '—') + (o.unidad_id ? ' · unidad ' + esc(o.unidad_id) : '') + '</dd>' +
+    (sim ? '<dt>Simuló</dt><dd>' + esc(sim.unidad_id) + ' · ' + plata(sim.precio, sim.moneda) + ' · ' + num(sim.anticipo_pct) + ' % + ' + num(sim.cuotas) + ' × ' + plata(sim.cuota, sim.moneda) + '</dd>' : '') +
+    '<dt>Próx. visita</dt><dd>' + (o.proxima_visita ? fechaHora(o.proxima_visita) : '—') + '</dd>' +
+    '<dt>Creada</dt><dd>' + fechaHora(o.creada) + '</dd></dl>' +
+    (o.notas ? '<div><label class="campo">Historial de notas</label><div class="notas">' + esc(o.notas) + '</div></div>' : '') +
+    (edita ? '<div class="fila">' +
+      '<div><label class="campo" for="op-estado">Estado</label><select id="op-estado">' + Object.keys(EST_OPP).filter((k) => k !== 'link_abierto' || o.estado === k)
+        .map((k) => '<option value="' + k + '"' + (k === o.estado ? ' selected' : '') + '>' + EST_OPP[k][0] + '</option>').join('') + '</select></div>' +
+      '<div><label class="campo" for="op-asesor">Asesor</label><select id="op-asesor"' + (D.usuario.rol === 'admin' ? '' : ' disabled') + '>' +
+        (o.asesor_id ? '' : '<option value="">Sin asignar</option>') + asesores().map((a) => '<option value="' + esc(a.id) + '"' + (a.id === o.asesor_id ? ' selected' : '') + '>' + esc(a.nombre) + '</option>').join('') + '</select></div></div>' +
+      (o.proyecto_id ? '<div><label class="campo" for="op-unidad">Unidad (reserva / venta)</label><select id="op-unidad"><option value="">' + (o.unidad_id ? 'Mantener ' + esc(o.unidad_id) : '—') + '</option>' +
+        libres.filter((u) => u.id !== o.unidad_id).map((u) => '<option value="' + esc(u.id) + '">' + esc(u.id) + ' · ' + esc(u.torre || '') + ' · piso ' + esc(u.piso) + ' · ' + num(u.superficie, 1) + ' m² · ' + plata(u.precio, u.moneda) + '</option>').join('') +
+        '</select><div class="muted" style="font-size:12px;margin-top:6px">Al elegir una unidad queda reservada para este interesado; si la oportunidad se gana pasa a vendida, y si se pierde vuelve a disponible.</div></div>' : '') +
+      '<div><label class="campo" for="op-nota">Agregar nota</label><textarea id="op-nota" maxlength="600" placeholder="Llamé, pidió planos, señó…"></textarea></div>'
+      : '<div class="muted" style="font-size:13px">Es una oportunidad de otro asesor: podés verla pero no modificarla.</div>') +
+    '</div><div class="m-pie"><button class="btn" data-cerrar>Cerrar</button>' + (edita ? '<button class="btn primario" id="op-ok">Guardar</button>' : '') + '</div>';
+  cerrarCon(dlg);
+  $('#ver-conv', dlg).addEventListener('click', (e) => {
+    e.preventDefault(); dlg.close();
+    $$('nav.tabs button').find((b) => b.dataset.tab === 'conversaciones').click();
+    abrirConversacion(o.wa_id);
+  });
+  const ok = $('#op-ok', dlg);
+  if (ok) ok.addEventListener('click', () => {
+    const datos = { oportunidad_id: o.id };
+    const est = $('#op-estado', dlg).value, as = $('#op-asesor', dlg).value, un = $('#op-unidad', dlg) ? $('#op-unidad', dlg).value : '', nota = $('#op-nota', dlg).value.trim();
+    if (est !== o.estado) datos.estado = est;
+    if (as && as !== o.asesor_id) datos.asesor_id = as;
+    if (un) datos.unidad_id = un;
+    if (nota) datos.nota = nota;
+    if (Object.keys(datos).length === 1) return dlg.close();
+    if (est === 'perdida' && o.unidad_id && !confirm('La unidad ' + o.unidad_id + ' vuelve a quedar disponible. ¿Seguimos?')) return;
+    escribir('oportunidad_actualizar', datos, 'Oportunidad actualizada.', dlg);
+  });
+  dlg.showModal();
+}
+
+// ---------------- stock ----------------
+const EST_UNI = { disponible: ['Disponible', 'good'], reservada: ['Reservada', 'warn'], vendida: ['Vendida', ''] };
+let STOCK = null, stockProy = null, stockEstado = 'todas';
+async function cargarStock() {
+  const ps = (D.proyectos || []).filter((p) => p.en_venta);
+  if (!ps.length) { $('#stock-tabla').innerHTML = '<div class="vacio">No hay proyectos en venta.</div>'; return; }
+  if (!stockProy || !ps.some((p) => p.id === stockProy)) stockProy = ps[0].id;
+  $('#stock-proyectos').innerHTML = ps.map((p) => '<button class="chip' + (p.id === stockProy ? ' on' : '') + '" data-p="' + esc(p.id) + '">' + esc(p.nombre) + '<span class="n">' + num(p.disponibles) + ' disp.</span></button>').join('');
+  $$('#stock-proyectos [data-p]').forEach((b) => b.addEventListener('click', () => { stockProy = b.dataset.p; $('#stock-tip').value = ''; cargarStock().catch((e) => toast(e.message, true)); }));
+  STOCK = await api('stock', { proyecto_id: stockProy });
+  const st = $('#stock-tip'), v = st.value;
+  st.innerHTML = '<option value="">Todas las tipologías</option>' + (STOCK.tipologias || []).map((t) => '<option value="' + esc(t.id) + '">' + esc(t.nombre) + '</option>').join('');
+  st.value = v;
+  pintarStock();
+}
+$('#stock-tip').addEventListener('change', pintarStock);
+function pintarStock() {
+  const us = STOCK.unidades || [], tips = STOCK.tipologias || [];
+  $('#stock-resumen').innerHTML = tips.map((t) => {
+    const u = us.filter((x) => x.tipologia_id === t.id), c = (e) => u.filter((x) => x.estado === e).length, n = Math.max(1, u.length);
+    const disp = u.filter((x) => x.estado === 'disponible').map((x) => +x.precio).filter(Boolean);
+    return '<div class="kpi"><span>' + esc(t.nombre) + ' · ' + num(t.superficie_min) + '–' + num(t.superficie_max) + ' m²</span><b>' + c('disponible') + ' <span class="muted" style="font-size:13px;font-weight:500">de ' + u.length + ' disponibles</span></b>' +
+      '<span>' + (disp.length ? 'desde ' + plata(Math.min(...disp), u[0].moneda) : 'sin stock') + ' · ' + c('reservada') + ' reserv. · ' + c('vendida') + ' vend.</span>' +
+      '<div class="barra-stock"><i style="width:' + (c('vendida') / n * 100) + '%;background:var(--text-3)"></i><i style="width:' + (c('reservada') / n * 100) + '%;background:var(--warn)"></i><i style="width:' + (c('disponible') / n * 100) + '%;background:var(--good)"></i></div></div>';
+  }).join('');
+  const tip = $('#stock-tip').value;
+  const base = us.filter((u) => !tip || u.tipologia_id === tip);
+  $('#stock-estados').innerHTML = [['todas', 'Todas'], ['disponible', 'Disponibles'], ['reservada', 'Reservadas'], ['vendida', 'Vendidas']]
+    .map(([k, l]) => '<button class="chip' + (k === stockEstado ? ' on' : '') + '" data-e="' + k + '">' + l + '<span class="n">' + base.filter((u) => k === 'todas' || u.estado === k).length + '</span></button>').join('');
+  $$('#stock-estados [data-e]').forEach((b) => b.addEventListener('click', () => { stockEstado = b.dataset.e; pintarStock(); }));
+  const f = base.filter((u) => stockEstado === 'todas' || u.estado === stockEstado);
+  const nomTip = (id) => (tips.find((t) => t.id === id) || {}).nombre || id || '—';
+  $('#stock-tabla').innerHTML = (us.some((u) => u.demo) ? '<div class="aviso" style="margin:8px 0">Stock y precios de demostración.</div>' : '') +
+    (f.length ? '<table class="t"><thead><tr><th>Unidad</th><th>Tipología</th><th class="num">Piso</th><th class="num">m²</th><th>Orientación</th><th class="num">Precio</th><th>Estado</th></tr></thead><tbody>' +
+    f.map((u) => '<tr class="click" data-u="' + esc(u.id) + '"><td class="mono">' + esc(u.id) + '<span class="sub">' + esc(u.torre || '') + '</span></td><td>' + esc(nomTip(u.tipologia_id)) + '</td><td class="num">' + esc(u.piso ?? '—') + '</td>' +
+      '<td class="num">' + num(u.superficie, 1) + '</td><td>' + esc(u.orientacion || '—') + '</td><td class="num">' + plata(u.precio, u.moneda) + '</td>' +
+      '<td><span class="pill ' + (EST_UNI[u.estado] || ['', ''])[1] + '">' + (EST_UNI[u.estado] || [u.estado])[0] + '</span>' + (u.comprador ? '<span class="sub">' + esc(u.comprador) + '</span>' : '') + '</td></tr>').join('') + '</tbody></table>'
+    : '<div class="vacio">No hay unidades con ese filtro.</div>');
+  $$('#stock-tabla [data-u]').forEach((tr) => tr.addEventListener('click', () => abrirUnidad(tr.dataset.u)));
+}
+function abrirUnidad(id) {
+  const u = (STOCK.unidades || []).find((x) => x.id === id);
+  if (!u) return;
+  const dlg = $('#dlg-unidad'), admin = D.usuario.rol === 'admin', deOpp = !!u.oportunidad_id;
+  dlg.innerHTML = '<div class="m-cab"><h2>Unidad ' + esc(u.id) + ' <span class="pill ' + (EST_UNI[u.estado] || ['', ''])[1] + '">' + (EST_UNI[u.estado] || [u.estado])[0] + '</span></h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo"><dl class="dl"><dt>Ubicación</dt><dd>' + esc(u.torre || '') + ' · piso ' + esc(u.piso ?? '—') + ' · ' + esc(u.orientacion || '') + '</dd>' +
+    '<dt>Superficie</dt><dd>' + num(u.superficie, 1) + ' m²</dd>' + (u.comprador ? '<dt>Interesado</dt><dd>' + esc(u.comprador) + '</dd>' : '') + '</dl>' +
+    (deOpp ? '<div class="aviso">Está tomada por una oportunidad: el estado se cambia desde el Pipeline.</div>' : '') +
+    '<div class="fila"><div><label class="campo" for="un-estado">Estado</label><select id="un-estado"' + (deOpp ? ' disabled' : '') + '>' +
+      Object.keys(EST_UNI).map((k) => '<option value="' + k + '"' + (k === u.estado ? ' selected' : '') + '>' + EST_UNI[k][0] + '</option>').join('') + '</select></div>' +
+    '<div><label class="campo" for="un-precio">Precio (' + esc(u.moneda) + ')</label><input type="text" inputmode="numeric" id="un-precio" value="' + esc(u.precio ?? '') + '"' + (admin ? '' : ' disabled') + '></div></div>' +
+    '<div class="muted" style="font-size:12.5px">Los cambios impactan al instante en el asistente: una unidad no disponible deja de ofrecerse y de simularse.' + (admin ? '' : ' El precio solo lo cambia un administrador.') + '</div>' +
+    '</div><div class="m-pie"><button class="btn" data-cerrar>Cerrar</button><button class="btn primario" id="un-ok">Guardar</button></div>';
+  cerrarCon(dlg);
+  $('#un-ok', dlg).addEventListener('click', () => {
+    const datos = { proyecto_id: stockProy, unidad_id: u.id };
+    const est = $('#un-estado', dlg).value, pr = $('#un-precio', dlg).value.replace(/[^\d.]/g, '');
+    if (!deOpp && est !== u.estado) datos.estado = est;
+    if (admin && pr && Number(pr) !== Number(u.precio)) datos.precio = Number(pr);
+    if (Object.keys(datos).length === 2) return dlg.close();
+    escribir('unidad_actualizar', datos, 'Unidad actualizada.', dlg);
+  });
+  dlg.showModal();
+}
+
+// ---------------- equipo (admin) ----------------
+let EQ = null;
+async function cargarEquipo() {
+  EQ = await api('equipo');
+  const as = EQ.asesores || [];
+  $('#eq-asesores').innerHTML = as.length ? '<table class="t"><thead><tr><th>Asesor</th><th>WhatsApp</th><th>Proyectos</th><th class="num">Oport. abiertas</th><th class="num">Visitas próx.</th><th>Horarios</th><th>Estado</th></tr></thead><tbody>' +
+    as.map((a) => '<tr class="click" data-a="' + esc(a.id) + '"><td>' + esc(a.nombre) + (a.email ? '<span class="sub">' + esc(a.email) + '</span>' : '') + '</td>' +
+      '<td>' + (a.wa_id ? '+' + esc(a.wa_id) : '<span class="pill warn">Sin WhatsApp</span>') + '</td>' +
+      '<td>' + (a.proyectos && a.proyectos.length ? a.proyectos.map((id) => esc(((D.proyectos || []).find((p) => p.id === id) || {}).nombre || id)).join(', ') : '<span class="muted">Todos</span>') + '</td>' +
+      '<td class="num">' + num(a.oportunidades_abiertas) + '</td><td class="num">' + num(a.visitas_proximas) + '</td>' +
+      '<td>' + (a.tramos ? num(a.tramos) + ' tramos' : '<span class="pill warn">Sin horarios</span>') + '</td>' +
+      '<td><span class="pill ' + (a.activo ? 'good' : '') + '">' + (a.activo ? 'Activo' : 'Inactivo') + '</span></td></tr>').join('') + '</tbody></table>'
+    : '<div class="vacio">No hay asesores.</div>';
+  $$('#eq-asesores [data-a]').forEach((tr) => tr.addEventListener('click', () => abrirAsesor(tr.dataset.a)));
+  const us = EQ.usuarios || [];
+  $('#eq-usuarios').innerHTML = us.length ? '<table class="t"><thead><tr><th>Usuario</th><th>Rol</th><th>Último ingreso</th><th>Estado</th></tr></thead><tbody>' +
+    us.map((u) => '<tr class="click" data-u="' + esc(u.id) + '"><td>' + esc(u.nombre) + '<span class="sub">' + esc(u.email) + '</span></td>' +
+      '<td>' + (u.rol === 'admin' ? 'Administrador' : 'Asesor · ' + esc(nombreAsesorEq(u.asesor_id))) + '</td><td class="muted">' + (u.ultimo_login ? fechaHora(u.ultimo_login) : 'Nunca') + '</td>' +
+      '<td><span class="pill ' + (!u.activo ? '' : u.bloqueado ? 'bad' : u.debe_cambiar_clave ? 'warn' : 'good') + '">' + (!u.activo ? 'Inactivo' : u.bloqueado ? 'Bloqueado 15 min' : u.debe_cambiar_clave ? 'Clave provisoria' : 'Activo') + '</span></td></tr>').join('') + '</tbody></table>'
+    : '<div class="vacio">No hay usuarios.</div>';
+  $$('#eq-usuarios [data-u]').forEach((tr) => tr.addEventListener('click', () => abrirUsuario(tr.dataset.u)));
+}
+const nombreAsesorEq = (id) => ((EQ && EQ.asesores || []).find((a) => a.id === id) || {}).nombre || '—';
+$('#btn-asesor-nuevo').addEventListener('click', () => abrirAsesor(null));
+$('#btn-usuario-nuevo').addEventListener('click', () => abrirUsuario(null));
+
+function abrirAsesor(id) {
+  const a = id ? (EQ.asesores || []).find((x) => x.id === id) : { nombre: '', wa_id: '', email: '', proyectos: [], activo: true };
+  const dlg = $('#dlg-asesor');
+  const ps = (D.proyectos || []).filter((p) => p.en_venta);
+  dlg.innerHTML = '<form id="f-as"><div class="m-cab"><h2>' + (id ? 'Editar asesor' : 'Nuevo asesor') + '</h2><button type="button" class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo"><div><label class="campo" for="as-nombre">Nombre</label><input type="text" id="as-nombre" required maxlength="80" value="' + esc(a.nombre) + '"></div>' +
+    '<div class="fila"><div><label class="campo" for="as-wa">WhatsApp (con código de país)</label><input type="text" id="as-wa" inputmode="tel" maxlength="25" placeholder="54 9 11 …" value="' + esc(a.wa_id || '') + '"></div>' +
+    '<div><label class="campo" for="as-email">Email</label><input type="email" id="as-email" maxlength="120" value="' + esc(a.email || '') + '"></div></div>' +
+    '<div><label class="campo">Proyectos que atiende (ninguno = todos)</label><div class="chips">' + ps.map((p) => '<label class="chip"><input type="checkbox" value="' + esc(p.id) + '"' + ((a.proyectos || []).includes(p.id) ? ' checked' : '') + ' style="accent-color:var(--brand);margin-right:6px">' + esc(p.nombre) + '</label>').join('') + '</div></div>' +
+    '<label class="recordar" style="margin:0"><input type="checkbox" id="as-activo"' + (a.activo ? ' checked' : '') + '> Activo (recibe leads y visitas)</label>' +
+    '<div class="muted" style="font-size:12.5px">El WhatsApp es donde le llegan los avisos de leads y visitas: tiene que haberle escrito al asistente alguna vez (ventana de 24 h de Meta). Los horarios se cargan desde Agenda → Horarios.</div>' +
+    '</div><div class="m-pie"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario">Guardar</button></div></form>';
+  cerrarCon(dlg);
+  $('#f-as', dlg).addEventListener('submit', (e) => {
+    e.preventDefault();
+    escribir('asesor_guardar', { id: id || null, nombre: $('#as-nombre', dlg).value.trim(), wa_id: $('#as-wa', dlg).value.trim(), email: $('#as-email', dlg).value.trim(),
+      proyectos: $$('.chips input:checked', dlg).map((c) => c.value), activo: $('#as-activo', dlg).checked }, id ? 'Asesor actualizado.' : 'Asesor creado. Cargale los horarios desde Agenda → Horarios.', dlg);
+  });
+  dlg.showModal();
+}
+
+const claveAzar = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const r = crypto.getRandomValues(new Uint32Array(14)); return Array.from(r, (x) => c[x % c.length]).join(''); };
+function abrirUsuario(id) {
+  const u = id ? (EQ.usuarios || []).find((x) => x.id === id) : { nombre: '', email: '', rol: 'asesor', asesor_id: '', activo: true };
+  const dlg = $('#dlg-usuario');
+  const opAs = (EQ.asesores || []).filter((a) => a.activo || a.id === u.asesor_id).map((a) => '<option value="' + esc(a.id) + '"' + (a.id === u.asesor_id ? ' selected' : '') + '>' + esc(a.nombre) + '</option>').join('');
+  dlg.innerHTML = '<form id="f-us"><div class="m-cab"><h2>' + (id ? 'Editar usuario' : 'Nuevo usuario') + '</h2><button type="button" class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+    '<div class="m-cuerpo"><div class="fila"><div><label class="campo" for="us-nombre">Nombre</label><input type="text" id="us-nombre" required maxlength="80" value="' + esc(u.nombre) + '"></div>' +
+    '<div><label class="campo" for="us-email">Email</label><input type="email" id="us-email" required maxlength="120" value="' + esc(u.email) + '"></div></div>' +
+    '<div class="fila"><div><label class="campo" for="us-rol">Rol</label><select id="us-rol"><option value="asesor"' + (u.rol === 'asesor' ? ' selected' : '') + '>Asesor</option><option value="admin"' + (u.rol === 'admin' ? ' selected' : '') + '>Administrador</option></select></div>' +
+    '<div id="us-as-box"><label class="campo" for="us-asesor">Asesor vinculado</label><select id="us-asesor">' + opAs + '</select></div></div>' +
+    '<div class="muted" style="font-size:12.5px;margin-top:-4px">Asesor: ve todo y edita solo su agenda y sus leads. Administrador: maneja todo, incluido el equipo.</div>' +
+    '<div><label class="campo" for="us-clave">' + (id ? 'Nueva clave provisoria (opcional)' : 'Clave provisoria') + '</label><div class="clave-gen"><input type="text" id="us-clave" minlength="10" maxlength="72" autocomplete="off"' + (id ? '' : ' required') + '><button type="button" class="btn chico" id="us-gen">Generar</button></div>' +
+    '<div class="muted" style="font-size:12.5px;margin-top:6px">Pasásela por un canal privado: al entrar se le pide que la cambie. Queda guardada cifrada; después no se puede volver a ver.</div></div>' +
+    (id ? '<label class="recordar" style="margin:0"><input type="checkbox" id="us-activo"' + (u.activo ? ' checked' : '') + '> Activo (puede ingresar)</label>' : '') +
+    '</div><div class="m-pie"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario">Guardar</button></div></form>';
+  cerrarCon(dlg);
+  const sync = () => ($('#us-as-box', dlg).hidden = $('#us-rol', dlg).value !== 'asesor');
+  $('#us-rol', dlg).addEventListener('change', sync); sync();
+  $('#us-gen', dlg).addEventListener('click', () => { $('#us-clave', dlg).value = claveAzar(); $('#us-clave', dlg).select(); });
+  $('#f-us', dlg).addEventListener('submit', (e) => {
+    e.preventDefault();
+    const clave = $('#us-clave', dlg).value;
+    if (clave && clave.length < 10) return toast('La clave tiene que tener al menos 10 caracteres.', true);
+    escribir('usuario_guardar', { id: id || null, nombre: $('#us-nombre', dlg).value.trim(), email: $('#us-email', dlg).value.trim(), rol: $('#us-rol', dlg).value,
+      asesor_id: $('#us-rol', dlg).value === 'asesor' ? $('#us-asesor', dlg).value : null, activo: id ? $('#us-activo', dlg).checked : true, clave: clave || null },
+      id ? 'Usuario actualizado.' : 'Usuario creado. Pasale el email y la clave provisoria.', dlg);
+  });
+  dlg.showModal();
+}
+
+// ---------------- mi clave ----------------
+function abrirClave(obligatorio) {
+  const dlg = $('#dlg-clave');
+  dlg.innerHTML = '<form id="f-cl"><div class="m-cab"><h2>' + (obligatorio ? 'Elegí tu clave' : 'Cambiar mi clave') + '</h2>' + (obligatorio ? '' : '<button type="button" class="x" data-cerrar aria-label="Cerrar">×</button>') + '</div>' +
+    '<div class="m-cuerpo">' + (obligatorio ? '<div class="aviso">Entraste con una clave provisoria. Elegí una propia para seguir.</div>' : '') +
+    '<div><label class="campo" for="cl-actual">Clave actual</label><input type="password" id="cl-actual" autocomplete="current-password" required></div>' +
+    '<div><label class="campo" for="cl-nueva">Clave nueva (mín. 10 caracteres)</label><input type="password" id="cl-nueva" autocomplete="new-password" minlength="10" required></div>' +
+    '<div><label class="campo" for="cl-rep">Repetila</label><input type="password" id="cl-rep" autocomplete="new-password" minlength="10" required></div>' +
+    '</div><div class="m-pie">' + (obligatorio ? '<button type="button" class="btn" id="cl-salir">Salir</button>' : '<button type="button" class="btn" data-cerrar>Cancelar</button>') + '<button class="btn primario">Guardar</button></div></form>';
+  cerrarCon(dlg);
+  dlg.oncancel = (e) => { if (obligatorio) e.preventDefault(); };   // Esc no la cierra si es obligatoria
+  if (obligatorio) $('#cl-salir', dlg).addEventListener('click', () => { dlg.close(); salir(); });
+  $('#f-cl', dlg).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if ($('#cl-nueva', dlg).value !== $('#cl-rep', dlg).value) return toast('Las claves nuevas no coinciden.', true);
+    try {
+      const r = await api('cambiar_clave', { datos: { actual: $('#cl-actual', dlg).value, nueva: $('#cl-nueva', dlg).value } });
+      token = r.token;
+      try { (localStorage.getItem(LS) ? localStorage : sessionStorage).setItem(LS, token); } catch { /* sin storage */ }
+      D.usuario.debe_cambiar_clave = false;
+      dlg.close(); toast('Clave actualizada.');
+    } catch (err) { if (err.message !== '401') toast(err.message, true); }
+  });
+  dlg.showModal();
+}
+$('#btn-clave').addEventListener('click', () => abrirClave(false));
 
 // ---------------- arranque ----------------
 (async () => {

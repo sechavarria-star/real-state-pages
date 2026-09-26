@@ -2,8 +2,9 @@
 
 Panel comercial multi-cliente del asistente de WhatsApp para desarrolladoras
 inmobiliarias: resumen y embudo, **agenda de visitas por asesor** (reprogramar,
-marcar, bloqueos, horarios, visitas manuales) y conversaciones (tomar / devolver
-al asistente). Sitio estático; la API es la Edge Function `realstate-panel`.
+marcar, bloqueos, horarios, visitas manuales), **pipeline** (estado, asesor, notas,
+reserva/venta de unidad), conversaciones (tomar / devolver al asistente), **stock**
+(estado y precio de cada unidad) y **equipo** (asesores y usuarios, solo admin). Sitio estático; la API es la Edge Function `realstate-panel`.
 
 ```
 apprealstate.giwa-ia.com  →  GitHub Pages (este index.html)
@@ -23,7 +24,9 @@ Usuarios por persona (`realstate.panel_usuarios`), rol `admin` (todo su cliente)
 15 min de bloqueo. El login devuelve un token firmado (HMAC) que dura 12 h y viaja
 en el body. Cada consulta se filtra por la cuenta del token.
 
-Alta, cambio de clave y baja (la clave se tipea, no queda en ningún archivo):
+Desde el panel, un admin da de alta usuarios en **Equipo** con una clave provisoria
+(se les pide cambiarla al entrar) y cada usuario cambia la suya en **Mi clave**.
+También por script (la clave se tipea, no queda en ningún archivo):
 
 ```bash
 python3 ../real-state/scripts/usuario_panel.py alta argencons ana@empresa.com "Ana Pérez" admin
