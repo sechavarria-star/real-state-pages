@@ -280,7 +280,7 @@ table.t td .sub { display: block; font-size: 12px; color: var(--text-3); }
   <form class="card-login" id="form-login" autocomplete="on">
     <div class="marca"><div class="logo">RS</div><div><strong>Panel comercial</strong><span>Real State</span></div></div>
     <h1>Ingresá a tu panel</h1>
-    <p>Leads, agenda de visitas y conversaciones del asistente de WhatsApp.</p>
+    <p>Leads, agenda de visitas y conversaciones del asistente de WhatsApp y Telegram.</p>
     <div class="grupo"><label class="campo" for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
     <div class="grupo"><label class="campo" for="clave">Clave</label><input id="clave" type="password" autocomplete="current-password" required></div>
     <label class="recordar"><input type="checkbox" id="recordar"> Recordarme en este dispositivo</label>
@@ -417,6 +417,13 @@ const ESTADOS = { pendiente: ['Pendiente', 'warn'], confirmada: ['Confirmada', '
 const COLORES = ['#7fb0ff', '#f2b56b', '#8fd6a8', '#e39ad8', '#f08a80', '#b6a4f5', '#6fd3d8', '#d9d27a'];
 
 const $ = (s, el = document) => el.querySelector(s);
+// Contactos: wa_id es el número de WhatsApp, o 'tg:<chat_id>' si escribió por Telegram.
+const esTg = (id) => String(id || '').startsWith('tg:');
+const canalNombre = (id) => (esTg(id) ? 'Telegram' : 'WhatsApp');
+const contactoTxt = (id, tgu) => (esTg(id) ? (tgu ? '@' + tgu : 'Telegram') : '+' + id);
+const contactoLink = (id, tgu) => (!esTg(id) ? '<a href="https://wa.me/' + esc(id) + '" target="_blank" rel="noopener">+' + esc(id) + '</a>'
+  : tgu ? '<a href="https://t.me/' + esc(tgu) + '" target="_blank" rel="noopener">@' + esc(tgu) + '</a>' : 'Sin usuario público de Telegram');
+const pillCanal = (id) => (esTg(id) ? '<span class="pill info">Telegram</span> ' : '<span class="pill">WhatsApp</span> ');
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n, d = 0) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: d });
@@ -698,7 +705,7 @@ function abrirVisita(id) {
     '<dt>Asesor</dt><dd>' + esc(nombreAsesor(v.asesor_id)) + '</dd>' +
     '<dt>Proyecto</dt><dd>' + esc(v.proyecto || '—') + '</dd>' +
     '<dt>Lugar</dt><dd>' + esc(v.lugar || '—') + '</dd>' +
-    '<dt>WhatsApp</dt><dd>' + (v.wa_id ? '<a href="https://wa.me/' + esc(v.wa_id) + '" target="_blank" rel="noopener">+' + esc(v.wa_id) + '</a>' : '—') + '</dd>' +
+    '<dt>' + canalNombre(v.wa_id) + '</dt><dd>' + (v.wa_id ? contactoLink(v.wa_id, v.tg_usuario) : '—') + '</dd>' +
     (sim ? '<dt>Simuló</dt><dd>' + esc(sim.unidad_id) + ' · ' + plata(sim.precio, sim.moneda) + ' · ' + num(sim.anticipo_pct) + ' % + ' + num(sim.cuotas) + ' cuotas de ' + plata(sim.cuota, sim.moneda) + '</dd>' : '') +
     (v.oportunidad ? '<dt>Oportunidad</dt><dd>' + esc(v.oportunidad) + (v.prioridad ? ' · prioridad ' + esc(v.prioridad) : '') + '</dd>' : '') +
     '<dt>Origen</dt><dd>' + (v.origen === 'panel' ? 'Cargada en el panel' : 'Agendada por el asistente') + '</dd>' +
@@ -710,7 +717,7 @@ function abrirVisita(id) {
       '<div><label class="campo" for="rp-asesor">Asesor</label><select id="rp-asesor">' + opcionesAsesor(v.asesor_id, true) + '</select></div>' +
       '</div><button class="btn" id="rp-ok" style="margin-top:12px">Guardar nuevo horario</button></details>' : '') +
     (!edita ? '<div class="muted" style="font-size:13px">Es la agenda de otro asesor: podés verla pero no modificarla.</div>' : '') +
-    (edita && activa && v.wa_id ? '<label class="avisar"><input type="checkbox" id="avisar" checked> Avisarle por WhatsApp si la confirmo, la reprogramo o la cancelo</label>' : '') +
+    (edita && activa && v.wa_id ? '<label class="avisar"><input type="checkbox" id="avisar" checked> Avisarle por ' + canalNombre(v.wa_id) + ' si la confirmo, la reprogramo o la cancelo</label>' : '') +
     '</div>' +
     '<div class="m-pie">' + (edita && activa
       ? (v.estado === 'pendiente' ? '<button class="btn" data-estado="confirmada">Confirmar</button>' : '') +
@@ -723,7 +730,7 @@ function abrirVisita(id) {
       const avisa = !!($('#avisar', dlg) && $('#avisar', dlg).checked);
       const ok = await confirmar({ titulo: 'Cancelar la visita', peligro: true, ok: 'Sí, cancelar',
         texto: (v.nombre || 'La visita') + ' · ' + fechaHora(v.inicio) + '. El turno queda libre para otra persona. ' +
-               (avisa ? 'Le vamos a avisar por WhatsApp.' : v.wa_id ? 'No se le va a avisar: acordate de escribirle.' : 'La visita no tiene WhatsApp: avisale por otro medio.') });
+               (avisa ? 'Le vamos a avisar por ' + canalNombre(v.wa_id) + '.' : v.wa_id ? 'No se le va a avisar: acordate de escribirle.' : 'La visita no tiene WhatsApp: avisale por otro medio.') });
       if (!ok) return;
     }
     const avisar = (est === 'cancelada' || est === 'confirmada') && !!($('#avisar', dlg) && $('#avisar', dlg).checked);
@@ -746,7 +753,7 @@ async function escribir(accion, datos, ok, dlg) {
     const res = await api(accion, { datos });
     if (dlg) dlg.close();
     const av = res && res.aviso;
-    if (av) toast(ok + (av.enviado ? ' Le avisamos por WhatsApp' + (av.via === 'plantilla' ? ' (con plantilla).' : '.') : ' No se pudo avisar por WhatsApp: ' + av.error), !av.enviado);
+    if (av) toast(ok + (av.enviado ? ' Le avisamos al interesado' + (av.via === 'plantilla' ? ' (con plantilla).' : '.') : ' No se le pudo avisar: ' + av.error), !av.enviado);
     else toast(ok);
     await cargar();
     const t = tabActiva();
@@ -862,9 +869,9 @@ function pintarConversaciones() {
   const q = $('#buscar').value.trim().toLowerCase();
   const f = cs.filter((c) => !q || [c.nombre, c.wa_id, c.proyecto, c.asesor].join(' ').toLowerCase().includes(q));
   $('#conv-items').innerHTML = f.length ? f.map((c) =>
-    '<button data-wa="' + esc(c.wa_id) + '" class="' + (c.wa_id === convSel ? 'sel' : '') + '"><span class="l1"><span>' + esc(c.nombre || '+' + c.wa_id) + '</span>' +
+    '<button data-wa="' + esc(c.wa_id) + '" class="' + (c.wa_id === convSel ? 'sel' : '') + '"><span class="l1"><span>' + esc(c.nombre || contactoTxt(c.wa_id, c.tg_usuario)) + '</span>' +
     '<span class="muted" style="font-weight:400;font-size:12px">' + (c.ultimo_ts ? fechaHora(c.ultimo_ts) : '') + '</span></span>' +
-    '<span class="l2">' + (c.modo === 'humano' ? '<span class="pill warn">Con asesor</span> ' : '') + esc(ETAPAS[c.etapa] || c.etapa || '') + (c.proyecto ? ' · ' + esc(c.proyecto) : '') + '</span>' +
+    '<span class="l2">' + pillCanal(c.wa_id) + (c.modo === 'humano' ? '<span class="pill warn">Con asesor</span> ' : '') + esc(ETAPAS[c.etapa] || c.etapa || '') + (c.proyecto ? ' · ' + esc(c.proyecto) : '') + '</span>' +
     '<span class="l2">' + esc(c.ultimo_mensaje || '') + '</span></button>').join('')
     : '<div class="vacio">Sin conversaciones.</div>';
   $$('#conv-items [data-wa]').forEach((b) => b.addEventListener('click', () => abrirConversacion(b.dataset.wa)));
@@ -898,10 +905,11 @@ function pintarCabeceraConv(h) {
   const sims = (h.simulaciones || []).slice(0, 3).map((s) => '<li>' + fechaCorta(s.ts) + ' · ' + esc(s.proyecto || '') + ' ' + esc(s.unidad_id || '') + ': ' + plata(s.precio, s.moneda) + ', ' + num(s.anticipo_pct) + ' % + ' + num(s.cuotas) + ' × ' + plata(s.cuota, s.moneda) + '</li>').join('');
   const vis = (h.visitas || []).map((v) => '<li>' + fechaHora(v.inicio) + ' · ' + esc(v.asesor) + ' · ' + (ESTADOS[v.estado] || [v.estado])[0] + '</li>').join('');
   $('#conv-det').innerHTML =
-    '<div class="panel-cab"><div><button class="btn chico" id="volver" style="margin-right:8px">←</button><h2 style="display:inline">' + esc(c.nombre || '+' + c.wa_id) + '</h2></div>' +
-    '<div class="acciones"><a class="btn chico" href="https://wa.me/' + esc(c.wa_id) + '" target="_blank" rel="noopener">Escribir por WhatsApp</a>' +
+    '<div class="panel-cab"><div><button class="btn chico" id="volver" style="margin-right:8px">←</button><h2 style="display:inline">' + esc(c.nombre || contactoTxt(c.wa_id, c.tg_usuario)) + '</h2></div>' +
+    '<div class="acciones">' + (!esTg(c.wa_id) ? '<a class="btn chico" href="https://wa.me/' + esc(c.wa_id) + '" target="_blank" rel="noopener">Escribir por WhatsApp</a>'
+      : c.tg_usuario ? '<a class="btn chico" href="https://t.me/' + esc(c.tg_usuario) + '" target="_blank" rel="noopener">Abrir en Telegram</a>' : '') +
     (c.modo === 'humano' ? '<button class="btn chico" id="modo" data-modo="bot">Devolver al asistente</button>' : '<button class="btn chico" id="modo" data-modo="humano">Tomar conversación</button>') + '</div></div>' +
-    '<div class="datos-contacto"><span>+' + esc(c.wa_id) + '</span><span>' + esc(ETAPAS[c.etapa] || c.etapa || '') + '</span>' +
+    '<div class="datos-contacto">' + pillCanal(c.wa_id) + '<span>' + esc(contactoTxt(c.wa_id, c.tg_usuario)) + '</span><span>' + esc(ETAPAS[c.etapa] || c.etapa || '') + '</span>' +
     (c.modo === 'humano' ? '<span class="pill warn">El asistente está en pausa</span>' : '<span class="pill good">Atiende el asistente</span>') +
     (c.asesor ? '<span>Asesor: ' + esc(c.asesor) + '</span>' : '') + (c.oportunidad ? '<span>Oportunidad: ' + esc(c.oportunidad) + '</span>' : '') +
     (c.proxima_visita ? '<span>Próxima visita: ' + fechaHora(c.proxima_visita) + '</span>' : '') + '</div>' +
@@ -951,7 +959,7 @@ function pintarPipeline() {
   $$('#pipe-estados [data-g]').forEach((b) => b.addEventListener('click', () => { pipeGrupo = b.dataset.g; pintarPipeline(); }));
   const f = base.filter((o) => enGrupo(o, pipeGrupo));
   $('#pipe-tabla').innerHTML = f.length ? '<table class="t"><thead><tr><th>Interesado</th><th>Proyecto</th><th>Asesor</th><th>Estado</th><th class="num">Monto</th><th>Próx. visita</th><th>Actualizada</th></tr></thead><tbody>' +
-    f.map((o) => '<tr class="click" data-opp="' + esc(o.id) + '"><td>' + esc(o.nombre || '+' + o.wa_id) + '<span class="sub">+' + esc(o.wa_id) + (o.modo === 'humano' ? ' · con asesor' : '') + '</span></td>' +
+    f.map((o) => '<tr class="click" data-opp="' + esc(o.id) + '"><td>' + esc(o.nombre || contactoTxt(o.wa_id, o.tg_usuario)) + '<span class="sub">' + esc(contactoTxt(o.wa_id, o.tg_usuario)) + (esTg(o.wa_id) ? ' · Telegram' : '') + (o.modo === 'humano' ? ' · con asesor' : '') + '</span></td>' +
       '<td>' + esc(o.proyecto || '—') + (o.unidad_id ? '<span class="sub">' + esc(o.unidad_id) + '</span>' : '') + '</td>' +
       '<td>' + (o.asesor_id ? esc(nombreAsesor(o.asesor_id)) : '<span class="muted">Sin asignar</span>') + '</td>' +
       '<td><span class="pill ' + (EST_OPP[o.estado] || ['', ''])[1] + '">' + (EST_OPP[o.estado] || [o.estado])[0] + '</span>' + (o.prioridad ? '<span class="sub">prioridad ' + esc(o.prioridad) + '</span>' : '') + '</td>' +
@@ -975,9 +983,9 @@ async function abrirOpp(id) {
     } catch (e) { /* sin stock: el selector queda vacío */ }
   }
   const sim = o.simulacion;
-  dlg.innerHTML = '<div class="m-cab"><h2>' + esc(o.nombre || '+' + o.wa_id) + ' <span class="pill ' + (EST_OPP[o.estado] || ['', ''])[1] + '">' + (EST_OPP[o.estado] || [o.estado])[0] + '</span></h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
+  dlg.innerHTML = '<div class="m-cab"><h2>' + esc(o.nombre || contactoTxt(o.wa_id, o.tg_usuario)) + ' <span class="pill ' + (EST_OPP[o.estado] || ['', ''])[1] + '">' + (EST_OPP[o.estado] || [o.estado])[0] + '</span></h2><button class="x" data-cerrar aria-label="Cerrar">×</button></div>' +
     '<div class="m-cuerpo"><dl class="dl">' +
-    '<dt>WhatsApp</dt><dd><a href="https://wa.me/' + esc(o.wa_id) + '" target="_blank" rel="noopener">+' + esc(o.wa_id) + '</a> · <a href="#" id="ver-conv">ver conversación</a></dd>' +
+    '<dt>' + canalNombre(o.wa_id) + '</dt><dd>' + contactoLink(o.wa_id, o.tg_usuario) + ' · <a href="#" id="ver-conv">ver conversación</a></dd>' +
     '<dt>Proyecto</dt><dd>' + esc(o.proyecto || '—') + (o.unidad_id ? ' · unidad ' + esc(o.unidad_id) : '') + '</dd>' +
     (sim ? '<dt>Simuló</dt><dd>' + esc(sim.unidad_id) + ' · ' + plata(sim.precio, sim.moneda) + ' · ' + num(sim.anticipo_pct) + ' % + ' + num(sim.cuotas) + ' × ' + plata(sim.cuota, sim.moneda) + '</dd>' : '') +
     '<dt>Próx. visita</dt><dd>' + (o.proxima_visita ? fechaHora(o.proxima_visita) : '—') + '</dd>' +
@@ -1189,13 +1197,19 @@ function abrirClave(obligatorio) {
 }
 $('#btn-clave').addEventListener('click', () => abrirClave(false));
 
-// ---------------- responder por WhatsApp ----------------
+// ---------------- responder por WhatsApp / Telegram ----------------
 const VENTANA_MS = (23 * 60 + 50) * 60000;   // Meta: 24 h desde el último mensaje del interesado (con margen)
 let borrador = {};
 function composer(c, h) {
   // Con el asistente atendiendo no se ofrece escribir: primero hay que tomar la conversación.
   if ((h.modo || c.modo) !== 'humano') {
     return '<div class="composer"><div class="hint">Atiende el asistente. Para escribirle vos, tocá <b>Tomar conversación</b>: el asistente se pausa y se habilita el cuadro para responder.</div></div>';
+  }
+  // Telegram no tiene ventana de 24 h: siempre se puede escribir libre.
+  if (esTg(c.wa_id)) {
+    return '<div class="composer"><div class="fila-c"><textarea id="msg" maxlength="4000" placeholder="Escribí tu respuesta… (Ctrl+Enter para enviar)">' + esc(borrador[c.wa_id] || '') + '</textarea>' +
+      '<button class="btn primario" id="btn-enviar">Enviar</button></div>' +
+      '<div class="hint">Telegram: podés escribirle cuando quieras. El asistente está en pausa en esta conversación.</div></div>';
   }
   const ult = h.ultimo_in ? +new Date(h.ultimo_in) : 0, resta = ult + VENTANA_MS - Date.now();
   if (resta > 0) {
